@@ -1,0 +1,7 @@
+node_modules/
+.idea
+atlassian-ide-plugin.xml
+.DS_Store
+.npmrc
+test
+test.js
