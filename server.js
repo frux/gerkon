@@ -43,6 +43,10 @@ function augmentResponseObject(res){
     return res;
 }
 
+/**
+ * Starts listen for request
+ * @param requestHandler
+ */
 function startListen(requestHandler){
 
     //if handler is a function
