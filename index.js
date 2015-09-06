@@ -12,14 +12,20 @@ var Server = require('./server'),
  * @returns {Gerkon}
  */
 function init(callback){
+
+    //if callback specified register it
     if(typeof callback === 'function'){
         Events.on('ready', callback);
     }
 
+    //start the server
     Server.start(function(req, res){
+
+        //handle request
         _onRequest(req, res);
     });
 
+    //fire server ready event
     Events.trigger('ready', {});
 
     return this;
@@ -118,25 +124,46 @@ function addRoute(method, rule, controller){
  * @private
  */
 function _getRuleForPath(path){
+
+    //look every rule
     for(var rule in routes){
 
+        //if this rule matches to our path return it
         if(routes.hasOwnProperty(rule) && (new RegExp('^' + rule + '$', 'ig').test(path))){
             return rule;
         }
     }
 }
 
+/**
+ * Extract params values from path by specified rule
+ * @param path {string} Path
+ * @param rule {string} Rule
+ * @returns {object}
+ * @private
+ */
 function _parseParams(path, rule){
     var params = {},
+
+        //get route of this rule
         route = routes[rule],
         max = route.paramsNames.length,
         i,
         parsedParams;
 
+    //if this rule have params
     if(max){
+
+        //extract params from path
         parsedParams = (new RegExp('^' + rule + '$', 'ig')).exec(path);
+
+        //if params extracted
         if(parsedParams){
+
+            //delete first value
             parsedParams.shift();
+
+            //assign each param value to its name
             for(i = 0; i < max; i++){
                 params[route.paramsNames[i]] = parsedParams[i];
             }
@@ -146,14 +173,28 @@ function _parseParams(path, rule){
     return params;
 }
 
+/**
+ * Handles every request
+ * @param req {object} Request object
+ * @param res {object} Response object
+ * @private
+ */
 function _onRequest(req, res){
+
+    //get a rule for path
     var rule = _getRuleForPath(req.url),
         route;
 
+    //if rule is found
     if(rule){
+
+        //get route of this rule
         route = routes[rule];
+
+        //parse params from path
         req.params = _parseParams(req.url, rule);
 
+        //void controller
         route.controller(req, res);
     }
 }
