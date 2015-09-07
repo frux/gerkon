@@ -11,7 +11,6 @@ var http = require('http'),
  * @returns {object}
  */
 function augmentRequestObject(req){
-    return req;
 }
 
 /**
@@ -39,8 +38,6 @@ function augmentResponseObject(res){
 
         return this;
     };
-
-    return res;
 }
 
 /**
@@ -56,8 +53,8 @@ function startListen(requestHandler){
         http.createServer(function(req, res){
 
             //augment req and res objects
-            req = augmentResponseObject(req);
-            res = augmentResponseObject(res);
+            augmentRequestObject(req);
+            augmentResponseObject(res);
 
             //handle request
             requestHandler(req, res);
