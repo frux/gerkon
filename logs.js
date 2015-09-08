@@ -2,9 +2,9 @@ var chalk = require('chalk'),
     Logs;
 
 function print(level, text){
-    level = level || 'info';
+    level = level || 'log';
 
-    if(this.enableLogs && (!(this.logLevel instanceof Array) || (this.logLevels.indexOf(level) > -1))){
+    if(this.enableLogs && (!(this.logLevels instanceof Array) || (this.logLevels.indexOf(level) > -1))){
         if(this.timestamp){
             text = chalk.gray(_getTime()) + ' ' + text;
         }
@@ -34,6 +34,7 @@ Logs = {
     print: print,
     info: function(text){ this.print('info', chalk.blue.inverse('INFO') + '    ' + text); },
     warn: function(text){ this.print('warn', chalk.yellow.inverse('WARN') + '    ' + text); },
+    error: function(text){ this.print('error', chalk.red.inverse('ERROR') + '   ' + text); return Error(text); },
     log: function(text){ this.print('log', text); },
     verbose: function(text){ this.print('verbose', chalk.magenta.inverse('VERBOSE') + ' ' + text); }
 };

@@ -5,6 +5,7 @@
 var Server = require('./server'),
     Events = require('./events'),
     Logs = require('./logs'),
+    config = {},
     routes = {},
     chalk = require('chalk'),
     Gerkon;
@@ -20,15 +21,22 @@ function init(callback){
         Events.on('ready', callback);
     }
 
+    //throw error if port is not specified
+    if(isNaN(getParam('port'))){
+        throw Logs.error('Port is not specified');
+    }
+
     //start the server
-    Server.start(function(req, res){
+    Server.start(getParam('port'), function(req, res){
 
         //handle request
         _onRequest(req, res);
     });
 
-    printLogo();
-    Logs.info('Gerkon starts to listen on ' + chalk.blue('localhost:8080'));
+    //show Gerkon logo
+    getParam('showLogo') && printLogo();
+
+    Logs.info('Gerkon starts to listen on ' + chalk.blue('localhost:' + getParam('port')));
 
     //fire server ready event
     Events.trigger('ready', {});
@@ -42,7 +50,6 @@ function init(callback){
  * @param rule {string} Route`s rule
  * @param controller {function} Route controller
  * @returns {Gerkon}
- * @private
  */
 function addRoute(method, rule, controller){
     var methods;
@@ -210,18 +217,64 @@ function _onRequest(req, res){
     }
 }
 
+/**
+ * Overwrite config
+ * @param newConfig {object} New config
+ * @returns {Gerkon}
+ */
+function setConfig(newConfig){
+    (typeof newConfig === 'object') && (config = newConfig);
+
+    //set log levels
+    Logs.logLevels = getParam('logLevels') || '*';
+
+    return this;
+}
+
+/**
+ * Set config param
+ * @param paramName {string} Param name
+ * @param paramValue {*} Param value
+ */
+function setParam(paramName, paramValue){
+    config[paramName] = paramValue;
+}
+
+/**
+ * Get config param value
+ * @param paramName {string} Param name
+ * @returns {*}
+ */
+function getParam(paramName){
+    return config[paramName];
+}
+
+function param(paramName, paramValue){
+    if(paramValue){
+        setParam(paramName, paramValue);
+        return this;
+    }else{
+        return getParam(paramName);
+    }
+}
+
 function printLogo(){
-    var logo =  '          ________________  __ ______  _   __\n' +
-                '   ----  / ____/ ____/ __ \\/ //_/ __ \\/ | / /\n' +
-                '------  / / __/ __/ / /_/ / ,< / / / /  |/ / \n' +
-                ' ----  / /_/ / /___/ _, _/ /| / /_/ / /|  /  \n' +
-                '------ \\____/_____/_/ |_/_/ |_\\____/_/ |_/   \n';
+    var logo =  '           _______ ______ ____   __   __ _______ __        __  \n' +
+                '  ------- / _____// ____// _  \\ / / _/_// ___  //  \\      / / \n' +
+                '   ----  / / ___ / /__  / /_/ // /_/ / / /  / // /\\ \\    / / \n' +
+                '------  / / /  // ___/ /    _//  __ \\ / /  / // /  \\ \\  / /   \n' +
+                ' ----  / /__/ // /___ /  \\ \\ / /  / // /__/ // /    \\ \\/ /    \n' +
+                '------ \\_____//______/__/__//_/  /_//______// /      \\  /     \n'+
+                '_____________________________________________/        \\/\n';
+
     console.log(chalk.green(logo));
 }
 
 Gerkon = {
     init: init,
-    route: addRoute
+    route: addRoute,
+    setConfig: setConfig,
+    param: param
 };
 
 module.exports = Gerkon;

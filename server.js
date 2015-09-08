@@ -44,7 +44,7 @@ function augmentResponseObject(res){
  * Starts listen for request
  * @param requestHandler
  */
-function startListen(requestHandler){
+function startListen(port, requestHandler){
 
     //if handler is a function
     if(typeof requestHandler === 'function'){
@@ -58,7 +58,7 @@ function startListen(requestHandler){
 
             //handle request
             requestHandler(req, res);
-        }).listen(8080);
+        }).listen(port);
     }
 }
 
