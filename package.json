@@ -9,5 +9,6 @@
   "author": "Vladimir Kudinov <qdinov@yandex.ru>",
   "license": "MIT",
   "dependencies": {
+    "chalk": "^1.1.1"
   }
 }

@@ -4,7 +4,9 @@
  */
 var Server = require('./server'),
     Events = require('./events'),
+    Logs = require('./logs'),
     routes = {},
+    chalk = require('chalk'),
     Gerkon;
 
 /**
@@ -24,6 +26,9 @@ function init(callback){
         //handle request
         _onRequest(req, res);
     });
+
+    printLogo();
+    Logs.info('Gerkon starts to listen on ' + chalk.blue('localhost:8080'));
 
     //fire server ready event
     Events.trigger('ready', {});
@@ -114,6 +119,7 @@ function addRoute(method, rule, controller){
         }
     }
 
+    Logs.verbose('Route added: ' + chalk.gray(rule));
     return this;
 }
 
@@ -183,6 +189,7 @@ function _onRequest(req, res){
 
     //get a rule for path
     var rule = _getRuleForPath(req.url),
+        log = req.method + ' ' + req.url,
         route;
 
     //if rule is found
@@ -196,7 +203,20 @@ function _onRequest(req, res){
 
         //void controller
         route.controller(req, res);
+
+        Logs.log(chalk.green(res.statusCode) + ' ' + log);
+    }else{
+        Logs.log(chalk.red(404) + ' ' + log);
     }
+}
+
+function printLogo(){
+    var logo =  '          ________________  __ ______  _   __\n' +
+                '   ----  / ____/ ____/ __ \\/ //_/ __ \\/ | / /\n' +
+                '------  / / __/ __/ / /_/ / ,< / / / /  |/ / \n' +
+                ' ----  / /_/ / /___/ _, _/ /| / /_/ / /|  /  \n' +
+                '------ \\____/_____/_/ |_/_/ |_\\____/_/ |_/   \n';
+    console.log(chalk.green(logo));
 }
 
 Gerkon = {
