@@ -8,6 +8,7 @@ var Server = require('./server'),
     config = {},
     routes = {},
     chalk = require('chalk'),
+    profilingStartTime,
     Gerkon;
 
 /**
@@ -43,6 +44,8 @@ function init(callback){
 
     return this;
 }
+
+/* Routing */
 
 /**
  * Add route
@@ -186,6 +189,8 @@ function _parseParams(path, rule){
     return params;
 }
 
+/* END: Routing */
+
 /**
  * Handles every request
  * @param req {object} Request object
@@ -193,6 +198,7 @@ function _parseParams(path, rule){
  * @private
  */
 function _onRequest(req, res){
+    _startProfiling();
 
     //get a rule for path
     var rule = _getRuleForPath(req.url),
@@ -211,11 +217,15 @@ function _onRequest(req, res){
         //void controller
         route.controller(req, res);
 
+        log += ' ' + _stopProfiling() + 'ms';
+
         Logs.log(chalk.green(res.statusCode) + ' ' + log);
     }else{
         Logs.log(chalk.red(404) + ' ' + log);
     }
 }
+
+/* Params */
 
 /**
  * Overwrite config
@@ -256,6 +266,17 @@ function param(paramName, paramValue){
     }else{
         return getParam(paramName);
     }
+}
+
+/* END: Params */
+
+/* Profiling */
+function _startProfiling(){
+    profilingStartTime = +new Date;
+}
+
+function _stopProfiling(){
+    return +new Date - profilingStartTime;
 }
 
 function printLogo(){
