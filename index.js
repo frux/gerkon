@@ -2,14 +2,20 @@
  * Gerkon
  * @version 0.0.1
  */
-var Server = require('./server'),
-    Events = require('./events'),
-    Logs = require('./logs'),
+
+var Gerkon = {
+        init: init,
+        route: addRoute,
+        setConfig: setConfig,
+        param: param
+    },
+    Server = require('./server')(Gerkon),
+    Events = require('./events')(Gerkon),
+    Logs = require('./logs')(Gerkon),
     config = {},
     routes = {},
     chalk = require('chalk'),
-    profilingStartTime,
-    Gerkon;
+    profilingStartTime;
 
 /**
  * Inititalize Gerkon
@@ -22,13 +28,8 @@ function init(callback){
         Events.on('ready', callback);
     }
 
-    //throw error if port is not specified
-    if(isNaN(getParam('port'))){
-        throw Logs.error('Port is not specified');
-    }
-
     //start the server
-    Server.start(getParam('port'), function(req, res){
+    Server.start(function(req, res){
 
         //handle request
         _onRequest(req, res);
@@ -220,7 +221,7 @@ function _onRequest(req, res){
 
         log += ' ' + _stopProfiling() + 'ms';
     }else{
-        res.sendCode(404);
+        res.sendCode(404, '<h1>Error 404</h1><p>The requested page is not found.</p>');
     }
 
     if(res.statusCode >= 400){
@@ -243,9 +244,6 @@ function _onRequest(req, res){
  */
 function setConfig(newConfig){
     (typeof newConfig === 'object') && (config = newConfig);
-
-    //set log levels
-    Logs.logLevels = getParam('logLevels') || '*';
 
     return this;
 }
@@ -325,14 +323,7 @@ function _printLogo(){
                 '------ \\_____/_____/__/__/_/  /_/______/ /   | |/ /     \n'+
                 '________________________________________/    |___/ \n';
 
-    console.log(chalk.green(logo));
+    Logs.log(chalk.green(logo));
 }
-
-Gerkon = {
-    init: init,
-    route: addRoute,
-    setConfig: setConfig,
-    param: param
-};
 
 module.exports = Gerkon;
