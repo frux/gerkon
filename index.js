@@ -203,7 +203,8 @@ function _onRequest(req, res){
     //get a rule for path
     var rule = _getRuleForPath(req.url),
         log = req.method + ' ' + req.url,
-        route;
+        route,
+        logColor;
 
     //if rule is found
     if(rule){
@@ -218,11 +219,19 @@ function _onRequest(req, res){
         route.controller(req, res);
 
         log += ' ' + _stopProfiling() + 'ms';
-
-        Logs.log(chalk.green(res.statusCode) + ' ' + log);
     }else{
-        Logs.log(chalk.red(404) + ' ' + log);
+        res.sendCode(404);
     }
+
+    if(res.statusCode >= 400){
+        logColor = 'red';
+    }else if(res.statusCode >= 300){
+        logColor = 'yellow';
+    }else{
+        logColor = 'green';
+    }
+
+    Logs.log(chalk[logColor](res.statusCode) + ' ' + log);
 }
 
 /* Params */

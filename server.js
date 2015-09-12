@@ -38,6 +38,50 @@ function augmentResponseObject(res){
 
         return this;
     };
+
+    /**
+     * Sends an http code and optionally some data
+     * @param code {number} Http code to send
+     * @param data {*|undefined} Data to send with code. For example code explanation.
+     */
+    res.sendCode = function(code, data){
+
+        //code nust be a number
+        if(!isNaN(code)){
+
+            //write code to the head
+            this.writeHead(code);
+
+            //if data is provided send it
+            this.write(data);
+
+            //close connection
+            this.end();
+        }
+    };
+
+    /**
+     * Sends redirection header
+     * @param location {string} Url server should redirects to
+     * @param code {number} Http redirect status code
+     */
+    res.redirect = function(location, code){
+
+        //if specified as string
+        if(typeof location === 'string'){
+
+            //if redirection code is wrong sends teporary redirect code (302)
+            if(isNaN(code) || code < 300 || code >= 400){
+                code = 302;
+            }
+
+            //write code and url to the header
+            this.writeHead(code, { 'Location': location });
+
+            //close connection
+            this.end();
+        }
+    };
 }
 
 /**
