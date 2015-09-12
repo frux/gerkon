@@ -35,7 +35,7 @@ function init(callback){
     });
 
     //show Gerkon logo
-    getParam('showLogo') && printLogo();
+    getParam('showLogo') && _printLogo();
 
     Logs.info('Gerkon starts to listen on ' + chalk.blue('localhost:' + getParam('port')));
 
@@ -268,11 +268,27 @@ function getParam(paramName){
     return config[paramName];
 }
 
+/**
+ * Param getter/setter
+ * @param paramName {string} Param name you want to get/set
+ * @param paramValue {*|undefined} Param value for using as setter
+ * @returns {*}
+ */
 function param(paramName, paramValue){
+
+    //param value provided
     if(paramValue){
+
+        //set it
         setParam(paramName, paramValue);
+
+        //return this for chaining
         return this;
+
+    //if value is not provided
     }else{
+
+        //just return param current value
         return getParam(paramName);
     }
 }
@@ -280,15 +296,27 @@ function param(paramName, paramValue){
 /* END: Params */
 
 /* Profiling */
+/**
+ * Remembers time of profiling start
+ * @private
+ */
 function _startProfiling(){
     profilingStartTime = +new Date;
 }
 
+/**
+ * Compare current and start time and return the differing
+ * @private
+ */
 function _stopProfiling(){
     return +new Date - profilingStartTime;
 }
 
-function printLogo(){
+/**
+ * Prints Gerkon logo if config param showLogo is true
+ * @private
+ */
+function _printLogo(){
     var logo =  '           _________________  __   ____________      __  \n' +
                 '  ------- / _____/ ____/ _  \\/ / _/_/ ___  /   |    / / \n' +
                 '    ---- / / ___/ /__ / /_/ / /_/_// /  / / /| |   / / \n' +
