@@ -96,10 +96,10 @@ function addRoute(method, rule, controller){
             rule = rule.replace('*', '\\S{0,}');
 
             //find all params in url template
-            paramsNames = rule.match(/\<([a-zA-Z]{1,})\>/g) || [];
+            paramsNames = rule.match(/\<([a-zA-Z0-9\_\-]{1,})\>/g) || [];
 
             //handle params "catching"
-            rule = rule.replace(/\<([a-zA-Z]{1,})\>/g, '([^\/]{1,})');
+            rule = rule.replace(/\<([a-zA-Z0-9\_\-]{1,})\>/g, '([^\/]{1,})');
 
             //escape "/" symbol
             rule = rule.replace(/\//g, '\\/');
@@ -140,13 +140,13 @@ function addRoute(method, rule, controller){
  * @returns {string}
  * @private
  */
-function _getRuleForPath(path){
+function _getRuleForPath(path, method){
 
     //look every rule
     for(var rule in routes){
 
         //if this rule matches to our path return it
-        if(routes.hasOwnProperty(rule) && (new RegExp('^' + rule + '$', 'ig').test(path))){
+        if(routes.hasOwnProperty(rule) && (new RegExp('^' + rule + '$', 'ig').test(path)) && (routes[rule].methods.indexOf(method) > -1)){
             return rule;
         }
     }
@@ -202,12 +202,12 @@ function _onRequest(req, res){
     _startProfiling();
 
     //get a rule for path
-    var rule = _getRuleForPath(req.url),
+    var rule = _getRuleForPath(req.url, req.method),
         log = req.method + ' ' + req.url,
         route,
         logColor;
 
-    //if rule is found
+    //if rule is found and method is accepted
     if(rule){
 
         //get route of this rule
