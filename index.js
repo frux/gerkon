@@ -226,7 +226,7 @@ function _handleRoute(rule, req, res){
 function _outputFileData(path, req, res, callback){
 
     //try to read file
-    fs.readFile(__dirname + path, function(err, data){
+    fs.readFile(path, function(err, data){
 
         //if reading is success
         if(!err){
@@ -241,13 +241,22 @@ function _outputFileData(path, req, res, callback){
 }
 
 /**
- * Sends 404 status code
+ * Tries to handle asterisk route else just sends 404 status code
  * @param req {object} Requset object
  * @param res {object} Response object
  * @private
  */
-function _on404(req, res){
-    res.sendCode(404, '<h1>Error 404</h1><p>The requested page is not found.</p>');
+function _404(req, res){
+    //if asterisk route defined
+    if(routes['\\S{0,}']){
+
+        //run handling asterisk
+        _handleRoute('\\S{0,}', req, res);
+
+        //if sterisk route is not defined send 404
+    }else{
+        res.sendCode(404, '<h1>Error 404</h1><p>The requested page is not found.</p>');
+    }
 }
 
 /* END: Routing */
@@ -273,31 +282,24 @@ function _onRequest(req, res){
         _handleRoute(rule, req, res);
 
     //if url is not matching to any rule
-    }else{
+    }else if(getParam('static.path')){
 
         //try to find and output static file
-        _outputFileData(getParam('static') + req.url, req, res, function(err, data){
+        _outputFileData((getParam('static.path') + req.url), req, res, function(err, data){
 
             //if file reading failed
             if(err){
-
-                //if asterisk route defined
-                if(routes['\\S{0,}']){
-
-                    //run handling asterisk
-                    _handleRoute('\\S{0,}', req, res);
-
-                //if sterisk route is not defined send 404
-                }else{
-                    console.log(err);
-                    _on404(req, res);
-                }
+                _404(req, res);
             }
         });
+    }else{
+        _404(req, res);
     }
 
+    //add profiling time to log
     log += ' ' + _stopProfiling() + 'ms';
 
+    //choose color in order to status code
     if(res.statusCode >= 400){
         logColor = 'red';
     }else if(res.statusCode >= 300){
@@ -306,6 +308,7 @@ function _onRequest(req, res){
         logColor = 'green';
     }
 
+    //output log
     Logs.log(chalk[logColor](res.statusCode) + ' ' + log);
 }
 
