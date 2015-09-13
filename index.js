@@ -15,6 +15,7 @@ var Gerkon = {
     config = {},
     routes = {},
     chalk = require('chalk'),
+    fs = require('fs'),
     profilingStartTime;
 
 /**
@@ -56,7 +57,8 @@ function init(callback){
  * @returns {Gerkon}
  */
 function addRoute(method, rule, controller){
-    var methods;
+    var methods,
+        paramsNames;
 
     //if method is not specified
     if(arguments.length === 2){
@@ -137,17 +139,31 @@ function addRoute(method, rule, controller){
 /**
  * Looks for rule matching the path
  * @param path {string} Path a rule should matches to
+ * @param method {string} Request method
  * @returns {string}
  * @private
  */
 function _getRuleForPath(path, method){
+    var regExpPassed,
+        methodAccepted,
+        notAsterisk;
 
-    //look every rule
     for(var rule in routes){
+        if(routes.hasOwnProperty(rule)){
 
-        //if this rule matches to our path return it
-        if(routes.hasOwnProperty(rule) && (new RegExp('^' + rule + '$', 'ig').test(path)) && (routes[rule].methods.indexOf(method) > -1)){
-            return rule;
+            //url match to the rule
+            regExpPassed = (new RegExp('^' + rule + '$', 'ig').test(path));
+
+            //request method accepted by this rule
+            methodAccepted = (routes[rule].methods.indexOf(method) > -1);
+
+            //rule is not a just asterisk (*)
+            notAsterisk = (rule !== '\\S{0,}');
+
+            //if this rule pass all conditions return it
+            if(regExpPassed && methodAccepted && notAsterisk){
+                return rule;
+            }
         }
     }
 }
@@ -190,6 +206,50 @@ function _parseParams(path, rule){
     return params;
 }
 
+function _handleRoute(rule, req, res){
+
+    //parse params from path
+    req.params = _parseParams(req.url, rule);
+
+    //void controller
+    routes[rule].controller(req, res);
+}
+
+/**
+ * Finds and outputs file
+ * @param path {string} File path
+ * @param req {object} Requset object
+ * @param res {object} Response object
+ * @param callback {function} Callback function
+ * @private
+ */
+function _outputFileData(path, req, res, callback){
+
+    //try to read file
+    fs.readFile(__dirname + path, function(err, data){
+
+        //if reading is success
+        if(!err){
+
+            //send file content
+            res.send(data);
+        }
+
+        //run callback
+        callback(err, data);
+    });
+}
+
+/**
+ * Sends 404 status code
+ * @param req {object} Requset object
+ * @param res {object} Response object
+ * @private
+ */
+function _on404(req, res){
+    res.sendCode(404, '<h1>Error 404</h1><p>The requested page is not found.</p>');
+}
+
 /* END: Routing */
 
 /**
@@ -204,25 +264,39 @@ function _onRequest(req, res){
     //get a rule for path
     var rule = _getRuleForPath(req.url, req.method),
         log = req.method + ' ' + req.url,
-        route,
         logColor;
 
-    //if rule is found and method is accepted
+    //if url matches to any rule
     if(rule){
 
-        //get route of this rule
-        route = routes[rule];
+        //run handling of this route
+        _handleRoute(rule, req, res);
 
-        //parse params from path
-        req.params = _parseParams(req.url, rule);
-
-        //void controller
-        route.controller(req, res);
-
-        log += ' ' + _stopProfiling() + 'ms';
+    //if url is not matching to any rule
     }else{
-        res.sendCode(404, '<h1>Error 404</h1><p>The requested page is not found.</p>');
+
+        //try to find and output static file
+        _outputFileData(getParam('static') + req.url, req, res, function(err, data){
+
+            //if file reading failed
+            if(err){
+
+                //if asterisk route defined
+                if(routes['\\S{0,}']){
+
+                    //run handling asterisk
+                    _handleRoute('\\S{0,}', req, res);
+
+                //if sterisk route is not defined send 404
+                }else{
+                    console.log(err);
+                    _on404(req, res);
+                }
+            }
+        });
     }
+
+    log += ' ' + _stopProfiling() + 'ms';
 
     if(res.statusCode >= 400){
         logColor = 'red';
