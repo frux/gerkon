@@ -117,3 +117,14 @@ describe('Routing', function(){
         });
     });
 });
+
+describe('Static files', function(){
+    it('Should read file /staticFileReading.test', function(done){
+        Gerkon.param('static.path', __dirname);
+        got('localhost:31631/staticFileReading.test', function(err, data, res){
+            if(data === 'ok'){
+                done();
+            }
+        })
+    })
+});
