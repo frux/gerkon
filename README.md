@@ -1,2 +1,2 @@
-#Gerkon [![Build Status](https://travis-ci.org/frux/gerkon.svg?branch=master)](https://travis-ci.org/frux/gerkon)
-![Coming soon](http://www.altechfze.com/assets/images/coming-soon.png)
+#Gerkon [![Build Status](http://travis-ci.org/frux/gerkon.svg?branch=master)](https://travis-ci.org/frux/gerkon)
+![Coming soon](http://freeproxy-us.appspot.com/lh6.googleusercontent.com/-JPUOvlD_cR4/UygM-wX6L9I/AAAAAAAAMkg/SZ8esMmgikQ/s388/coming-soon.png)
