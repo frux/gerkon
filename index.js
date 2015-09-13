@@ -206,13 +206,23 @@ function _parseParams(path, rule){
     return params;
 }
 
-function _handleRoute(rule, req, res){
+/**
+ * Run route controller
+ * @param rule {string} Route rule
+ * @param req {object} Request object
+ * @param res {object} Response object
+ * @param callback {function|undefined} Callback function
+ * @private
+ */
+function _handleRoute(rule, req, res, callback){
 
     //parse params from path
     req.params = _parseParams(req.url, rule);
 
     //void controller
     routes[rule].controller(req, res);
+
+    (callback|| function(){})();
 }
 
 /**
@@ -244,19 +254,46 @@ function _outputFileData(path, req, res, callback){
  * Tries to handle asterisk route else just sends 404 status code
  * @param req {object} Requset object
  * @param res {object} Response object
+ * @param callback {function|undefined} Callback function
  * @private
  */
-function _404(req, res){
+function _404(req, res, callback){
     //if asterisk route defined
     if(routes['\\S{0,}']){
 
         //run handling asterisk
-        _handleRoute('\\S{0,}', req, res);
+        _handleRoute('\\S{0,}', req, res, callback);
 
-        //if sterisk route is not defined send 404
+    //if asterisk route is not defined send 404
     }else{
-        res.sendCode(404, '<h1>Error 404</h1><p>The requested page is not found.</p>');
+        res.sendCode(404, 'Error 404. The requested page is not found.');
+        res.statusCode = 404;
+
+        (callback || function(){})();
     }
+}
+
+/**
+ * Output log of request
+ * @param statusCode {number} Request status code
+ * @param log {string} Log string
+ * @private
+ */
+function _logRequest(statusCode, log){
+
+    log += ' ' + _stopProfiling() + 'ms';
+
+    //choose color in order to status code
+    if(statusCode >= 400){
+        logColor = 'red';
+    }else if(statusCode >= 300){
+        logColor = 'yellow';
+    }else{
+        logColor = 'green';
+    }
+
+    //output log
+    Logs.log(chalk[logColor](statusCode) + ' ' + log);
 }
 
 /* END: Routing */
@@ -279,7 +316,11 @@ function _onRequest(req, res){
     if(rule){
 
         //run handling of this route
-        _handleRoute(rule, req, res);
+        _handleRoute(rule, req, res, function(){
+
+            //output log
+            _logRequest(res.statusCode, log);
+        });
 
     //if url is not matching to any rule
     }else if(getParam('static.path')){
@@ -289,27 +330,23 @@ function _onRequest(req, res){
 
             //if file reading failed
             if(err){
-                _404(req, res);
+                _404(req, res, function(){
+
+                    //output log
+                    _logRequest(res.statusCode, log);
+                });
             }
+
+            //output log
+            _logRequest(res.statusCode, log);
         });
     }else{
-        _404(req, res);
+        _404(req, res, function(){
+
+            //output log
+            _logRequest(res.statusCode, log);
+        });
     }
-
-    //add profiling time to log
-    log += ' ' + _stopProfiling() + 'ms';
-
-    //choose color in order to status code
-    if(res.statusCode >= 400){
-        logColor = 'red';
-    }else if(res.statusCode >= 300){
-        logColor = 'yellow';
-    }else{
-        logColor = 'green';
-    }
-
-    //output log
-    Logs.log(chalk[logColor](res.statusCode) + ' ' + log);
 }
 
 /* Params */

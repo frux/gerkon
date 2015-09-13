@@ -3,6 +3,7 @@
  */
 module.exports = function(Gerkon){
     var http = require('http'),
+        fs = require('fs'),
         Server;
 
     /**
@@ -26,9 +27,6 @@ module.exports = function(Gerkon){
          * @returns {object}
          */
         res.send = function(data){
-
-            //send success code
-            this.writeHead(200, { 'Content-type': 'text/plain' });
 
             //write data to response
             this.write(data);
@@ -59,6 +57,54 @@ module.exports = function(Gerkon){
 
                 //close connection
                 this.end();
+            }
+        };
+
+        /**
+         * Sends file content
+         * @param path {string} Absolute file path
+         * @param mime {string|undefined} File mime-type
+         * @param callback
+         */
+        res.sendFile = function(path, mime, callback){
+
+            if(typeof path === 'string'){
+                //if all arguments provided
+                if(arguments.length === 3){
+
+                    //default mime-type is plain/text
+                    mime = mime || 'plain/text';
+
+                    //if one parameter skipped
+                }else if(arguments.length === 2){
+
+                    //if second argument is function
+                    if(typeof mime === 'function'){
+
+                        //set mime-type to default
+                        callback = mime;
+                        mime = 'plain/text';
+                    }
+                }
+
+                //try to read file
+                fs.readFile(path, (function(err, data){
+
+                    //if no errors
+                    if(!err){
+
+                        //add header
+                        this.writeHead(200, { 'Content-type': mime });
+
+                        //write file content
+                        this.write(data);
+
+                        //close connection
+                        this.end();
+                    }
+
+                    (callback || function(){})(err, data);
+                }).bind(this));
             }
         };
 
