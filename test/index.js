@@ -27,6 +27,7 @@ describe('Initialization', function(){
 
         //define port
         Gerkon.param('port', 31631)
+            .param('logs.disabled', true)
 
             //define test route
             .route('/test1', function(req, res){
