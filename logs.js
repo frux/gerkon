@@ -7,25 +7,14 @@ module.exports = function(Gerkon){
 
     /**
      * Outputs text to the console
-     * @param level {string|undefined} Level of logs to output. Default is a log
      * @param text {string} Text to output to the console
      */
-    function print(level, text){
-        level = level || 'log';
+    function print(text){
+        //output time at the start of the console string
+        text = chalk.gray(_getTime()) + ' ' + text;
 
-        //if config param enableLogs is true and logLevel is a registered level of logs
-        if(Gerkon.param('logs.enabled') && Gerkon.param('logs.levels').indexOf(level) > -1){
-
-            //if timestamp parameter is true
-            if(Gerkon.param('logs.timestamp')){
-
-                //output time at the start of the console string
-                text = chalk.gray(_getTime()) + ' ' + text;
-            }
-
-            //output it
-            console.log(text);
-        }
+        //output it
+        console.log(text);
     }
 
     /**
@@ -45,20 +34,20 @@ module.exports = function(Gerkon){
     Logs = {
         print: print,
         info: function(text){
-            this.print('info', chalk.blue.inverse('INFO') + '    ' + text);
+            this.print(chalk.blue.inverse('INFO') + '    ' + text);
         },
         warn: function(text){
-            this.print('warn', chalk.yellow.inverse('WARN') + '    ' + text);
+            this.print(chalk.yellow.inverse('WARN') + '    ' + text);
         },
         error: function(text){
-            this.print('error', chalk.red.inverse('ERROR') + '   ' + text);
+            this.print(chalk.red.inverse('ERROR') + '   ' + text);
             return Error(text);
         },
         log: function(text){
-            this.print('log', text);
+            this.print(text);
         },
         verbose: function(text){
-            this.print('verbose', chalk.magenta.inverse('VERBOSE') + ' ' + text);
+            this.print(chalk.magenta.inverse('VERBOSE') + ' ' + text);
         }
     };
 

@@ -128,11 +128,10 @@ function addRoute(method, rule, controller){
                 }
 
                 //if the same route is exists throw error
-            }else throw Error('Route already exists (' + rule + ')');
+            }else throw Logs.error('Route already exists (' + rule + ')');
         }
     }
 
-    Logs.verbose('Route added: ' + chalk.gray(rule));
     return this;
 }
 
@@ -215,14 +214,22 @@ function _parseParams(path, rule){
  * @private
  */
 function _handleRoute(rule, req, res, callback){
+    var next;
+    if(callback.length === 4){
+        next = function(){
+            (callback|| function(){})();
+        };
+    }
 
     //parse params from path
     req.params = _parseParams(req.url, rule);
 
     //void controller
-    routes[rule].controller(req, res);
+    routes[rule].controller(req, res, next);
 
-    (callback|| function(){})();
+    if(!next){
+        (callback|| function(){})();
+    }
 }
 
 /**
@@ -335,10 +342,11 @@ function _onRequest(req, res){
                     //output log
                     _logRequest(res.statusCode, log);
                 });
-            }
+            }else{
 
-            //output log
-            _logRequest(res.statusCode, log);
+                //output log
+                _logRequest(res.statusCode, log);
+            }
         });
     }else{
         _404(req, res, function(){
@@ -437,7 +445,7 @@ function _printLogo(){
                 '------ \\_____/_____/__/__/_/  /_/______/ /   | |/ /     \n'+
                 '________________________________________/    |___/ \n';
 
-    Logs.log(chalk.green(logo));
+    console.log(chalk.green(logo));
 }
 
 module.exports = Gerkon;
