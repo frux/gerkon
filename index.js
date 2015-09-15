@@ -37,7 +37,7 @@ function init(callback){
     });
 
     //show Gerkon logo
-    getParam('showLogo') && _printLogo();
+    getParam('logo') && _printLogo();
 
     Logs.info('Gerkon starts to listen on ' + chalk.blue('localhost:' + getParam('port')));
 
