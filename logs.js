@@ -10,11 +10,15 @@ module.exports = function(Gerkon){
      * @param text {string} Text to output to the console
      */
     function print(text){
-        //output time at the start of the console string
-        text = chalk.gray(_getTime()) + ' ' + text;
 
-        //output it
-        console.log(text);
+        if(!Gerkon.param('logs.disabled')){
+
+            //output time at the start of the console string
+            text = chalk.gray(_getTime()) + ' ' + text;
+
+            //output it
+            console.log(text);
+        }
     }
 
     /**
