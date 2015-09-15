@@ -154,7 +154,7 @@ function _getRuleForPath(path, method){
             regExpPassed = (new RegExp('^' + rule + '$', 'ig').test(path));
 
             //request method accepted by this rule
-            methodAccepted = (routes[rule].methods.indexOf(method) > -1);
+            methodAccepted = (routes[rule].methods.indexOf(method.toUpperCase()) > -1);
 
             //rule is not a just asterisk (*)
             notAsterisk = (rule !== '\\S{0,}');
