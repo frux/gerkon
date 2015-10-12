@@ -9,7 +9,7 @@
     "coveralls": "./node_modules/.bin/istanbul-coveralls"
   },
   "author": "Vladimir Kudinov <qdinov@yandex.ru>",
-  "license": "MIT",
+  "license": "WTFPL",
   "engines" : { "node" : ">=4.0.0" },
   "dependencies": {
     "chalk": "^1.1.1",
