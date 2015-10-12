@@ -1,7 +1,5 @@
 language: node_js
 node_js:
   - 'stable'
-before_install:
-  - pip install codecov
 after_success:
-  - codecov
+  - npm run coverage && npm run coveralls

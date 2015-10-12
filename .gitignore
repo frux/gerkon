@@ -4,3 +4,5 @@ atlassian-ide-plugin.xml
 .DS_Store
 .npmrc
 page/
+coverage/
+npm-debug.log

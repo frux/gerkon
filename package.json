@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "./node_modules/mocha/bin/mocha"
+    "test": "./node_modules/mocha/bin/mocha",
+    "coverage": "./node_modules/.bin/istanbul cover ./node_modules/.bin/_mocha",
+    "coveralls": "./node_modules/.bin/istanbul-coveralls"
   },
   "author": "Vladimir Kudinov <qdinov@yandex.ru>",
   "license": "MIT",
@@ -14,6 +16,8 @@
   },
   "devDependencies": {
     "got": "^4.2.0",
+    "istanbul": "^0.3.22",
+    "istanbul-coveralls": "^1.0.3",
     "mocha": "^2.3.2"
   }
 }
