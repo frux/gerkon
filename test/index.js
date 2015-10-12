@@ -119,6 +119,34 @@ describe('Routing', function(){
     });
 });
 
+describe('Multiple routing', function(){
+    Gerkon.route('/multiple-routing', [
+        function(req, res, next){
+            res._dataToSend = '1';
+            next();
+        },
+        function(req, res, next){
+            res._dataToSend += '2';
+            next();
+        },
+        function(req, res, next){
+            res._dataToSend += '3';
+            next();
+        },
+        function(req, res, next){
+            res._dataToSend += '4';
+            res.send(res._dataToSend);
+        }
+    ]);
+    it('Should run all the provided handlers', function(done){
+        got('localhost:31631/multiple-routing', function(err, data, res){
+            if(data === '1234'){
+                done();
+            }
+        });
+    });
+});
+
 describe('Static files', function(){
     it('Should read file /staticFileReading.test', function(done){
         Gerkon.param('static.path', __dirname);

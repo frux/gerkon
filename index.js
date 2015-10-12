@@ -12,10 +12,11 @@ var Gerkon = {
     Server = require('./server')(Gerkon),
     Events = require('./events')(Gerkon),
     Logs = require('./logs')(Gerkon),
-    config = {},
-    routes = {},
     chalk = require('chalk'),
     fs = require('fs'),
+    Seenk = require('seenk'),
+    config = {},
+    routes = {},
     profilingStartTime;
 
 /**
@@ -53,10 +54,10 @@ function init(callback){
  * Add route
  * @param method {string|Array|undefined} Available request method or methods
  * @param rule {string} Route`s rule
- * @param controller {function} Route controller
+ * @param controllers {function|Array} Route controller or array of controllers
  * @returns {Gerkon}
  */
-function addRoute(method, rule, controller){
+function addRoute(method, rule, controllers){
     var methods,
         paramsNames;
 
@@ -67,7 +68,7 @@ function addRoute(method, rule, controller){
         methods = [ 'GET', 'POST', 'PUT', 'DELETE', 'HEAD' ];
 
         //and shift arguments
-        controller = rule;
+        controllers = rule;
         rule = method;
 
     //if method specified as array
@@ -86,7 +87,15 @@ function addRoute(method, rule, controller){
     //if rule is a string
     if(typeof rule === 'string'){
 
-        if(typeof controller === 'function'){
+        if(typeof controllers === 'function'){
+            controllers = [controllers];
+        }
+
+        if(controllers instanceof Array){
+
+            controllers = controllers.map(function(controller){
+                return (controller.length > 2 ? _wrapController(controller) : controller);
+            });
 
             // escape "?" symbol
             rule = rule.replace('?', '\?');
@@ -111,7 +120,7 @@ function addRoute(method, rule, controller){
 
                 //construct it
                 routes[rule] = {
-                    controller: controller,
+                    controllers: controllers,
                     paramsNames: [],
                     methods: methods
                 };
@@ -133,6 +142,18 @@ function addRoute(method, rule, controller){
     }
 
     return this;
+}
+
+function _wrapController(controller){
+    if(typeof controller !== 'function'){
+        return;
+    }
+
+    return function(req, res){
+        return new Promise(function(resolve, reject){
+            controller(req, res, resolve);
+        });
+    };
 }
 
 /**
@@ -210,26 +231,20 @@ function _parseParams(path, rule){
  * @param rule {string} Route rule
  * @param req {object} Request object
  * @param res {object} Response object
- * @param callback {function|undefined} Callback function
  * @private
  */
-function _handleRoute(rule, req, res, callback){
-    var next;
-    if(callback.length === 4){
-        next = function(){
-            (callback|| function(){})();
-        };
-    }
-
+function _handleRoute(rule, req, res){
+    var controllers = routes[rule].controllers,
+        max = controllers.length,
+        i;
     //parse params from path
     req.params = _parseParams(req.url, rule);
 
-    //void controller
-    routes[rule].controller(req, res, next);
-
-    if(!next){
-        (callback|| function(){})();
-    }
+    return Seenk(function*(){
+        for(i = 0; i < max; i++){
+            yield controllers[i](req, res);
+        }
+    });
 }
 
 /**
@@ -237,47 +252,55 @@ function _handleRoute(rule, req, res, callback){
  * @param path {string} File path
  * @param req {object} Requset object
  * @param res {object} Response object
- * @param callback {function} Callback function
+ * @returns {Promise}
  * @private
  */
-function _outputFileData(path, req, res, callback){
+function _outputFileData(path, req, res){
 
-    //try to read file
-    fs.readFile(path, function(err, data){
+    return new Promise(function(resolve, reject){
 
-        //if reading is success
-        if(!err){
+        //try to read file
+        fs.readFile(path, function(err, data){
 
-            //send file content
-            res.send(data);
-        }
+            //reject if failed
+            if(err){
+                return reject(err);
+            }
 
-        //run callback
-        callback(err, data);
+            //if reading is success send file content
+            resolve(data);
+        });
     });
+
+
 }
 
 /**
  * Tries to handle asterisk route else just sends 404 status code
  * @param req {object} Requset object
  * @param res {object} Response object
- * @param callback {function|undefined} Callback function
+ * @returns {Promise}
  * @private
  */
-function _404(req, res, callback){
-    //if asterisk route defined
-    if(routes['\\S{0,}']){
+function _404(req, res){
+    return new Promise(function(resolve, reject){
 
-        //run handling asterisk
-        _handleRoute('\\S{0,}', req, res, callback);
+        //if asterisk route defined
+        if(routes['\\S{0,}']){
 
-    //if asterisk route is not defined send 404
-    }else{
-        res.sendCode(404, 'Error 404. The requested page is not found.');
-        res.statusCode = 404;
+            //run handling asterisk
+            _handleRoute('\\S{0,}', req, res)
+                .then(function(){
+                    resolve(404);
+                });
 
-        (callback || function(){})();
-    }
+            //if asterisk route is not defined send 404
+        }else{
+            res.sendCode(404, 'Error 404. The requested page is not found.');
+            res.statusCode = 404;
+            resolve(404);
+        }
+    });
 }
 
 /**
@@ -323,37 +346,35 @@ function _onRequest(req, res){
     if(rule){
 
         //run handling of this route
-        _handleRoute(rule, req, res, function(){
-
-            //output log
-            _logRequest(res.statusCode, log);
-        });
+        _handleRoute(rule, req, res)
+            .then(function(){
+                //output log
+                _logRequest(res.statusCode, log);
+            });
 
     //if url is not matching to any rule
     }else if(getParam('static.path')){
 
         //try to find and output static file
-        _outputFileData((getParam('static.path') + req.url), req, res, function(err, data){
+        _outputFileData((getParam('static.path') + req.url), req, res)
+            .then(function(fileData){
+                res.send(fileData);
+            })
+            .catch(function(err){
+                _404(req, res)
+                    .then(function(){
 
-            //if file reading failed
-            if(err){
-                _404(req, res, function(){
-
-                    //output log
-                    _logRequest(res.statusCode, log);
-                });
-            }else{
+                        //output log
+                        _logRequest(res.statusCode, log);
+                    });
+            });
+    }else{
+        _404(req, res)
+            .then(function(){
 
                 //output log
                 _logRequest(res.statusCode, log);
-            }
-        });
-    }else{
-        _404(req, res, function(){
-
-            //output log
-            _logRequest(res.statusCode, log);
-        });
+            });
     }
 }
 

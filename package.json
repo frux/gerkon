@@ -9,7 +9,8 @@
   "author": "Vladimir Kudinov <qdinov@yandex.ru>",
   "license": "MIT",
   "dependencies": {
-    "chalk": "^1.1.1"
+    "chalk": "^1.1.1",
+    "seenk": "^0.1.0"
   },
   "devDependencies": {
     "got": "^4.2.0",
