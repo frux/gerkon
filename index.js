@@ -144,6 +144,12 @@ function addRoute(method, rule, controllers){
     return this;
 }
 
+/**
+ * Wrap controller into async function returning Promise
+ * @param controller {function} Controller function
+ * @returns {function}
+ * @private
+ */
 function _wrapController(controller){
     if(typeof controller !== 'function'){
         return;
