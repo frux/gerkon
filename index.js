@@ -6,6 +6,7 @@
 var Gerkon = {
         init: init,
         route: addRoute,
+        mediator: addMediator,
         setConfig: setConfig,
         param: param
     },
@@ -17,6 +18,7 @@ var Gerkon = {
     Seenk = require('seenk'),
     config = {},
     routes = {},
+    mediators = [],
     profilingStartTime;
 
 /**
@@ -94,7 +96,7 @@ function addRoute(method, rule, controllers){
         if(controllers instanceof Array){
 
             controllers = controllers.map(function(controller){
-                return (controller.length > 2 ? _wrapController(controller) : controller);
+                return (controller.length > 2 ? _wrapAsync(controller) : controller);
             });
 
             // escape "?" symbol
@@ -146,18 +148,21 @@ function addRoute(method, rule, controllers){
 
 /**
  * Wrap controller into async function returning Promise
- * @param controller {function} Controller function
+ * @param syncFunction {function} Some synchronous function
  * @returns {function}
  * @private
  */
-function _wrapController(controller){
-    if(typeof controller !== 'function'){
+function _wrapAsync(syncFunction){
+
+    //if controller is a function
+    if(typeof syncFunction !== 'function'){
         return;
     }
 
+    //wrap it
     return function(req, res){
         return new Promise(function(resolve, reject){
-            controller(req, res, resolve);
+            syncFunction(req, res, resolve);
         });
     };
 }
@@ -341,48 +346,95 @@ function _logRequest(statusCode, log){
  * @private
  */
 function _onRequest(req, res){
+
+    //start profiling
     _startProfiling();
 
-    //get a rule for path
+        //get a rule for path
     var rule = _getRuleForPath(req.url, req.method),
+
+        //add request method and url to log string
         log = req.method + ' ' + req.url,
         logColor;
 
-    //if url matches to any rule
-    if(rule){
+    _runMediators(req, res)
+        .then(function(){
+            //if url matches to any rule
+            if(rule){
 
-        //run handling of this route
-        _handleRoute(rule, req, res)
-            .then(function(){
-                //output log
-                _logRequest(res.statusCode, log);
-            });
+                //run handling of this route
+                _handleRoute(rule, req, res)
+                    .then(function(){
+                        //output log
+                        _logRequest(res.statusCode, log);
+                    });
 
-    //if url is not matching to any rule
-    }else if(getParam('static.path')){
+                //if url is not matching to any rule
+            }else if(getParam('static.path')){
 
-        //try to find and output static file
-        _outputFileData((getParam('static.path') + req.url), req, res)
-            .then(function(fileData){
-                res.send(fileData);
-            })
-            .catch(function(err){
+                //try to find and output static file
+                _outputFileData((getParam('static.path') + req.url), req, res)
+                    .then(function(fileData){
+                        res.send(fileData);
+                    })
+                    .catch(function(err){
+                        _404(req, res)
+                            .then(function(){
+
+                                //output log
+                                _logRequest(res.statusCode, log);
+                            });
+                    });
+            }else{
                 _404(req, res)
                     .then(function(){
 
                         //output log
                         _logRequest(res.statusCode, log);
                     });
-            });
-    }else{
-        _404(req, res)
-            .then(function(){
-
-                //output log
-                _logRequest(res.statusCode, log);
-            });
-    }
+            }
+        });
 }
+
+/* Mediators */
+
+/**
+ * Add mediator
+ * @param mediator {function} Mediator function
+ * @returns {Gerkon}
+ */
+function addMediator(mediator){
+    if(typeof mediator === 'function'){
+        if(mediator.length > 2){
+            mediator = _wrapAsync(mediator);
+        }
+
+        mediators.push(mediator);
+    }
+
+    return this;
+}
+
+/**
+ * Run all connected mediators
+ * @param req {object} Req object
+ * @param res {object} Res object
+ * @returns {*}
+ * @private
+ */
+function _runMediators(req, res){
+    var max = mediators.length,
+        i;
+
+    return Seenk(function*(){
+        for(i = 0; i < max; i++){
+            yield mediators[i](req, res);
+        }
+    });
+}
+
+/* END: Mediators */
+
 
 /* Params */
 

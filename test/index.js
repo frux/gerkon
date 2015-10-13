@@ -154,6 +154,30 @@ describe('Static files', function(){
             if(data === 'ok'){
                 done();
             }
-        })
+        });
     })
+});
+
+describe('Mediators', function(){
+    Gerkon
+        .mediator(function(req, res){
+            req.mediator1 = 'ok';
+        })
+        .mediator(function(req, res, next){
+            setTimeout(function(){
+                req.mediator2 = 'ok';
+                next();
+            }, 0);
+        })
+        .route('/mediators', function(req, res){
+            res.send(req.mediator1 + req.mediator2);
+        });
+
+    it('Should output result of mediators', function(done){
+        got('localhost:31631/mediators', function(err, data, res){
+            if(data === 'okok'){
+                done();
+            }
+        })
+    });
 });
