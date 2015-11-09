@@ -10,7 +10,9 @@
   },
   "author": "Vladimir Kudinov <qdinov@yandex.ru>",
   "license": "WTFPL",
-  "engines" : { "node" : ">=4.0.0" },
+  "engines": {
+    "node": ">=4.0.0"
+  },
   "dependencies": {
     "chalk": "^1.1.1",
     "seenk": "^0.2.1"

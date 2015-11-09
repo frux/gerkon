@@ -1,53 +1,61 @@
+'use strict';
 /**
  * Gerkon
  * @version 0.0.1
  */
 
-var Gerkon = {
-        init: init,
-        route: addRoute,
-        mediator: addMediator,
-        setConfig: setConfig,
-        param: param
-    },
-    Server = require('./server')(Gerkon),
-    Events = require('./events')(Gerkon),
-    Logs = require('./logs')(Gerkon),
-    chalk = require('chalk'),
-    fs = require('fs'),
-    Seenk = require('seenk'),
-    config = {},
-    routes = {},
-    mediators = [],
-    profilingStartTime;
+const Gerkon = {
+	init,
+	route,
+	mediator,
+	setConfig,
+	param
+};
+
+const Server = require('./server');
+const Logs = require('./logs');
+const Seenk = require('seenk');
+const chalk = require('chalk');
+const fs = require('fs');
+const ASTERISK = new RegExp('^\\S{0,}$', 'i');
+
+let config = {},
+	routes = new Map(),
+	mediators = [];
 
 /**
  * Inititalize Gerkon
- * @returns {Gerkon}
+ * @returns {Promise}
  */
-function init(callback){
+function init(){
 
-    //if callback specified register it
-    if(typeof callback === 'function'){
-        Events.on('ready', callback);
-    }
+	//show Gerkon logo
+	_getParam('logo') && _printLogo();
 
-    //start the server
-    Server.start(function(req, res){
+	//connect mediators
+	Gerkon.mediator(require('./mediators/main.js'));
 
-        //handle request
-        _onRequest(req, res);
-    });
+	//if param `logs` was set to false diable logging
+	!_getParam('logs') && Logs.disable();
 
-    //show Gerkon logo
-    getParam('logo') && _printLogo();
+	//check port and set default
+	if(!_getParam('port')){
+		_setParam('port', 8080);
+		Logs.warn('Port was not specified. Gerkon is using default 8080.');
+	}
 
-    Logs.info('Gerkon starts to listen on ' + chalk.blue('localhost:' + getParam('port')));
+	//start the server
+	return Server.start(_getParam('port'), (req, res) => {
+			_onRequest(req, res);
+		})
+		.then(() => {
 
-    //fire server ready event
-    Events.trigger('ready', {});
-
-    return this;
+			//notify about server starting
+			Logs.info(`Gerkon has started to listen on ${chalk.blue('localhost:' + _getParam('port'))}`);
+		})
+		.catch((err) => {
+			throw Logs.error(err);
+		});
 }
 
 /* Routing */
@@ -59,91 +67,109 @@ function init(callback){
  * @param controllers {function|Array} Route controller or array of controllers
  * @returns {Gerkon}
  */
-function addRoute(method, rule, controllers){
-    var methods,
-        paramsNames;
+function route(method, rule, controllers){
+	let _rule = rule,
+		route,
+		methods,
+		paramsNames;
 
-    //if method is not specified
-    if(arguments.length === 2){
+	//if method is not specified
+	if(arguments.length === 2){
 
-        //set all available methods
-        methods = [ 'GET', 'POST', 'PUT', 'DELETE', 'HEAD' ];
+		//set all available methods
+		methods = [ 'GET', 'POST', 'PUT', 'DELETE', 'HEAD' ];
 
-        //and shift arguments
-        controllers = rule;
-        rule = method;
+		//and shift arguments
+		controllers = _rule;
+		_rule = method;
 
-    //if method specified as array
-    }else if(method instanceof Array){
+		//if method specified as array
+	}else if(method instanceof Array){
 
-        //just assign it
-        methods = method;
+		//just assign it
+		methods = method;
 
-    //if specified one method only
-    }else{
+		//if specified one method only
+	}else{
 
-        //wrap it in array
-        methods = [ method.toUpperCase() ];
-    }
+		//wrap it in array
+		methods = [ method.toUpperCase() ];
+	}
 
-    //if rule is a string
-    if(typeof rule === 'string'){
+	//if rule is a string
+	if(typeof _rule === 'string'){
 
-        if(typeof controllers === 'function'){
-            controllers = [controllers];
-        }
+		if(typeof controllers === 'function'){
+			controllers = [ controllers ];
+		}
 
-        if(controllers instanceof Array){
+		if(_rule === '*'){
+			_rule = ASTERISK;
+		}else{
 
-            controllers = controllers.map(function(controller){
-                return (controller.length > 2 ? _wrapAsync(controller) : controller);
-            });
+			// escape "?" symbol
+			_rule = _rule.replace('?', '\?');
 
-            // escape "?" symbol
-            rule = rule.replace('?', '\?');
+			// handle optional symbols {}
+			_rule = _rule.replace(/\{(.*)\}/g, '(?:$1){0,1}');
 
-            // handle optional symbols {}
-            rule = rule.replace(/\{(.*)\}/g, '(?:$1){0,1}');
+			//handle "Any" symbol "*"
+			_rule = _rule.replace('*', '\\S{0,}');
 
-            //handle "Any" symbol "*"
-            rule = rule.replace('*', '\\S{0,}');
+			//find all params in url template
+			paramsNames = _rule.match(/\<([a-zA-Z0-9\_\-]{1,})\>/g) || [];
 
-            //find all params in url template
-            paramsNames = rule.match(/\<([a-zA-Z0-9\_\-]{1,})\>/g) || [];
+			//handle params "catching"
+			_rule = _rule.replace(/\<([a-zA-Z0-9\_\-]{1,})\>/g, '([^\/]{1,})');
 
-            //handle params "catching"
-            rule = rule.replace(/\<([a-zA-Z0-9\_\-]{1,})\>/g, '([^\/]{1,})');
+			//escape "/" symbol
+			_rule = _rule.replace(/\//g, '\\/');
 
-            //escape "/" symbol
-            rule = rule.replace(/\//g, '\\/');
+			_rule = new RegExp('^' + _rule + '$', 'i');
+		}
 
-            //if the same route is not exists
-            if(!routes[rule]){
+		//if the same route is not exists
+		if(!routes.has(_rule)){
 
-                //construct it
-                routes[rule] = {
-                    controllers: controllers,
-                    paramsNames: [],
-                    methods: methods
-                };
+			if(controllers instanceof Array){
 
-                //if there are params in template was found
-                if(paramsNames){
+				//wrap each asynchronous controller into Promise
+				controllers = controllers.map((controller) =>
+					(controller.length > 2 ? _wrapAsync(controller) : controller));
 
-                    //remember list of parameters names
-                    routes[rule].paramsNames = paramsNames.map(function(param){
+				//make a route object
+				route = {
+					controllers: controllers,
+					methods: methods
+				};
 
-                        //RegExp found parameters names wrapped in <>. Remove brackets.
-                        return param.substr(1, param.length - 2);
-                    });
-                }
+				//if there are params in a rule was found
+				if(paramsNames){
 
-                //if the same route is exists throw error
-            }else throw Logs.error('Route already exists (' + rule + ')');
-        }
-    }
+					//remember list of parameters names
+					route.paramsNames = paramsNames.map((param) =>
 
-    return this;
+						//RegExp found parameters names wrapped in <>. Remove brackets.
+						param.substr(1, param.length - 2)
+					);
+				}else{
+					route.paramsNames = [];
+				}
+
+				//add this route to other routes
+				routes.set(_rule, route);
+
+			}else{
+				throw Logs.error('controllers must be a function or an array of functions');
+			}
+
+			//if the same route is exists throw error
+		}else{
+			throw Logs.error(`Route already exists (${rule})`);
+		}
+	}
+
+	return this;
 }
 
 /**
@@ -154,17 +180,15 @@ function addRoute(method, rule, controllers){
  */
 function _wrapAsync(syncFunction){
 
-    //if controller is a function
-    if(typeof syncFunction !== 'function'){
-        return;
-    }
+	//if controller is a function
+	if(typeof syncFunction !== 'function'){
+		return;
+	}
 
-    //wrap it
-    return function(req, res){
-        return new Promise(function(resolve, reject){
-            syncFunction(req, res, resolve);
-        });
-    };
+	//wrap it
+	return (req, res) => new Promise(function(resolve, reject){
+		syncFunction(req, res, resolve);
+	});
 }
 
 /**
@@ -175,28 +199,26 @@ function _wrapAsync(syncFunction){
  * @private
  */
 function _getRuleForPath(path, method){
-    var regExpPassed,
-        methodAccepted,
-        notAsterisk;
+	var regExpPassed,
+		methodAccepted,
+		notAsterisk;
 
-    for(var rule in routes){
-        if(routes.hasOwnProperty(rule)){
+	for(let rule of routes.keys()){
 
-            //url match to the rule
-            regExpPassed = (new RegExp('^' + rule + '$', 'ig').test(path));
+		//url match to the rule
+		regExpPassed = rule.test(path);
 
-            //request method accepted by this rule
-            methodAccepted = (routes[rule].methods.indexOf(method.toUpperCase()) > -1);
+		//request method accepted by this rule
+		methodAccepted = (routes.get(rule).methods.indexOf(method.toUpperCase()) > -1);
 
-            //rule is not a just asterisk (*)
-            notAsterisk = (rule !== '\\S{0,}');
+		//rule is not a just asterisk (*)
+		notAsterisk = (rule !== ASTERISK);
 
-            //if this rule pass all conditions return it
-            if(regExpPassed && methodAccepted && notAsterisk){
-                return rule;
-            }
-        }
-    }
+		//if this rule pass all conditions return it
+		if(regExpPassed && methodAccepted && notAsterisk){
+			return rule;
+		}
+	}
 }
 
 /**
@@ -207,34 +229,30 @@ function _getRuleForPath(path, method){
  * @private
  */
 function _parseParams(path, rule){
-    var params = {},
+	var params = {},
 
-        //get route of this rule
-        route = routes[rule],
-        max = route.paramsNames.length,
-        i,
-        parsedParams;
+		//get route of this rule
+		route = routes.get(rule),
+		max = route.paramsNames.length,
+		parsedParams;
 
-    //if this rule have params
-    if(max){
+	//if this rule have params
+	if(max){
 
-        //extract params from path
-        parsedParams = (new RegExp('^' + rule + '$', 'ig')).exec(path);
+		//if params extracted successfully
+		if(parsedParams = rule.exec(path)){
 
-        //if params extracted
-        if(parsedParams){
+			//delete first value
+			parsedParams.shift();
 
-            //delete first value
-            parsedParams.shift();
+			//assign each param value to its name
+			for(let i = 0; i < max; i++){
+				params[ route.paramsNames[ i ] ] = parsedParams[ i ];
+			}
+		}
+	}
 
-            //assign each param value to its name
-            for(i = 0; i < max; i++){
-                params[route.paramsNames[i]] = parsedParams[i];
-            }
-        }
-    }
-
-    return params;
+	return params;
 }
 
 /**
@@ -245,17 +263,19 @@ function _parseParams(path, rule){
  * @private
  */
 function _handleRoute(rule, req, res){
-    var controllers = routes[rule].controllers,
-        max = controllers.length,
-        i;
-    //parse params from path
-    req.params = _parseParams(req.url, rule);
+	var controllers = routes.get(rule).controllers,
+		max = controllers.length,
+		i;
 
-    return Seenk(function*(){
-        for(i = 0; i < max; i++){
-            yield controllers[i](req, res);
-        }
-    });
+	//parse params from path
+	req.params = _parseParams(req.url, rule);
+
+	//exec each controller
+	return Seenk(function*(){
+		for(i = 0; i < max; i++){
+			yield controllers[ i ](req, res);
+		}
+	});
 }
 
 /**
@@ -268,73 +288,84 @@ function _handleRoute(rule, req, res){
  */
 function _outputFileData(path, req, res){
 
-    return new Promise(function(resolve, reject){
+	return new Promise(function(resolve, reject){
 
-        //try to read file
-        fs.readFile(path, function(err, data){
+		//try to read file
+		fs.readFile(path, function(err, data){
 
-            //reject if failed
-            if(err){
-                return reject(err);
-            }
+			//reject if failed
+			if(err){
+				return reject(err);
+			}
 
-            //if reading is success send file content
-            resolve(data);
-        });
-    });
-
+			//if reading is success send file content
+			resolve(data);
+		});
+	});
 
 }
 
 /**
  * Tries to handle asterisk route else just sends 404 status code
- * @param req {object} Requset object
+ * @param req {object} Request object
  * @param res {object} Response object
  * @returns {Promise}
  * @private
  */
 function _404(req, res){
-    return new Promise(function(resolve, reject){
+	return new Promise(function(resolve, reject){
+		var asteriskRoute = routes.get(ASTERISK);
 
-        //if asterisk route defined
-        if(routes['\\S{0,}']){
+		//if asterisk route defined
+		if(asteriskRoute){
 
-            //run handling asterisk
-            _handleRoute('\\S{0,}', req, res)
-                .then(function(){
-                    resolve(404);
-                });
+			//run handling asterisk
+			_handleRoute(ASTERISK, req, res)
+				.then(() => resolve(404));
 
-            //if asterisk route is not defined send 404
-        }else{
-            res.sendCode(404, 'Error 404. The requested page is not found.');
-            res.statusCode = 404;
-            resolve(404);
-        }
-    });
+		//if asterisk route is not defined send 404
+		}else{
+
+			//send response
+			res.sendCode(404, 'Error 404. The requested page is not found.');
+
+			//set status code
+			res.statusCode = 404;
+
+			//output log
+			Logs.logRequest(404, `${req.method} ${req.url} `);
+
+			resolve(404);
+		}
+	});
 }
 
 /**
- * Output log of request
- * @param statusCode {number} Request status code
- * @param log {string} Log string
+ * Sends 502 status code
+ * @param req {object} Requset object
+ * @param res {object} Response object
+ * @param err {object} Error object
+ * @returns {Promise}
  * @private
  */
-function _logRequest(statusCode, log){
+function _502(req, res, err){
+	return new Promise(function(resolve, reject){
 
-    log += ' ' + _stopProfiling() + 'ms';
+		//send response
+		res.sendCode(502, 'Error 502. Server error.');
 
-    //choose color in order to status code
-    if(statusCode >= 400){
-        logColor = 'red';
-    }else if(statusCode >= 300){
-        logColor = 'yellow';
-    }else{
-        logColor = 'green';
-    }
+		//set status code
+		res.statusCode = 502;
 
-    //output log
-    Logs.log(chalk[logColor](statusCode) + ' ' + log);
+		//output log
+		Logs.logRequest(502, `${req.method} ${req.url} `);
+
+		//output error
+		Logs.error(err.stack);
+
+		//reject promise
+		return resolve(502);
+	});
 }
 
 /* END: Routing */
@@ -346,54 +377,38 @@ function _logRequest(statusCode, log){
  * @private
  */
 function _onRequest(req, res){
+	let log;
 
-    //start profiling
-    _startProfiling();
+	//start profiling
+	Logs.startProfiling();
 
-        //get a rule for path
-    var rule = _getRuleForPath(req.url, req.method),
+	//get a rule for path
+	const rule = _getRuleForPath(req.url, req.method);
 
-        //add request method and url to log string
-        log = req.method + ' ' + req.url,
-        logColor;
+	//add request method and url to log string
+	log = `${req.method} ${req.url}`;
 
-    _runMediators(req, res)
-        .then(function(){
-            //if url matches to any rule
-            if(rule){
+	_runMediators(req, res)
+		.then(() =>{
+			//if url matches to any rule
+			if(rule){
 
-                //run handling of this route
-                _handleRoute(rule, req, res)
-                    .then(function(){
-                        //output log
-                        _logRequest(res.statusCode, log);
-                    });
+				//run handling of this route
+				_handleRoute(rule, req, res)
+					.then((statusCode) => Logs.logRequest(res.statusCode, log))
+					.catch((err) => _502(req, res, err));
 
-                //if url is not matching to any rule
-            }else if(getParam('static.path')){
+				//if url is not matching to any rule
+			}else if(_getParam('static.path')){
 
-                //try to find and output static file
-                _outputFileData((getParam('static.path') + req.url), req, res)
-                    .then(function(fileData){
-                        res.send(fileData);
-                    })
-                    .catch(function(err){
-                        _404(req, res)
-                            .then(function(){
-
-                                //output log
-                                _logRequest(res.statusCode, log);
-                            });
-                    });
-            }else{
-                _404(req, res)
-                    .then(function(){
-
-                        //output log
-                        _logRequest(res.statusCode, log);
-                    });
-            }
-        });
+				//try to find and output static file
+				_outputFileData((_getParam('static.path') + req.url), req, res)
+					.then((fileData) => res.send(fileData))
+					.catch((err) => _404(req, res));
+			}else{
+				_404(req, res);
+			}
+		});
 }
 
 /* Mediators */
@@ -403,16 +418,16 @@ function _onRequest(req, res){
  * @param mediator {function} Mediator function
  * @returns {Gerkon}
  */
-function addMediator(mediator){
-    if(typeof mediator === 'function'){
-        if(mediator.length > 2){
-            mediator = _wrapAsync(mediator);
-        }
+function mediator(mediator){
+	if(typeof mediator === 'function'){
+		if(mediator.length > 2){
+			mediator = _wrapAsync(mediator);
+		}
 
-        mediators.push(mediator);
-    }
+		mediators.push(mediator);
+	}
 
-    return this;
+	return this;
 }
 
 /**
@@ -423,14 +438,14 @@ function addMediator(mediator){
  * @private
  */
 function _runMediators(req, res){
-    var max = mediators.length,
-        i;
+	var max = mediators.length,
+		i;
 
-    return Seenk(function*(){
-        for(i = 0; i < max; i++){
-            yield mediators[i](req, res);
-        }
-    });
+	return Seenk(function*(){
+		for(i = 0; i < max; i++){
+			yield mediators[ i ](req, res);
+		}
+	});
 }
 
 /* END: Mediators */
@@ -444,9 +459,9 @@ function _runMediators(req, res){
  * @returns {Gerkon}
  */
 function setConfig(newConfig){
-    (typeof newConfig === 'object') && (config = newConfig);
+	(typeof newConfig === 'object') && (config = newConfig);
 
-    return this;
+	return this;
 }
 
 /**
@@ -454,8 +469,8 @@ function setConfig(newConfig){
  * @param paramName {string} Param name
  * @param paramValue {*} Param value
  */
-function setParam(paramName, paramValue){
-    config[paramName] = paramValue;
+function _setParam(paramName, paramValue){
+	config[ paramName ] = paramValue;
 }
 
 /**
@@ -463,8 +478,8 @@ function setParam(paramName, paramValue){
  * @param paramName {string} Param name
  * @returns {*}
  */
-function getParam(paramName){
-    return config[paramName];
+function _getParam(paramName){
+	return config[ paramName ];
 }
 
 /**
@@ -475,56 +490,37 @@ function getParam(paramName){
  */
 function param(paramName, paramValue){
 
-    //param value provided
-    if(paramValue){
+	//param value provided
+	if(typeof paramValue !== 'undefined'){
 
-        //set it
-        setParam(paramName, paramValue);
+		//set it
+		_setParam(paramName, paramValue);
 
-        //return this for chaining
-        return this;
+		//return this for chaining
+		return this;
+	}
 
-    //if value is not provided
-    }else{
-
-        //just return param current value
-        return getParam(paramName);
-    }
+	//if value is not provided just return param current value
+	return _getParam(paramName);
 }
 
 /* END: Params */
-
-/* Profiling */
-/**
- * Remembers time of profiling start
- * @private
- */
-function _startProfiling(){
-    profilingStartTime = +new Date;
-}
-
-/**
- * Compare current and start time and return the differing
- * @private
- */
-function _stopProfiling(){
-    return +new Date - profilingStartTime;
-}
 
 /**
  * Prints Gerkon logo if config param showLogo is true
  * @private
  */
 function _printLogo(){
-    var logo =  '           _________________  __   ____________      __  \n' +
-                '  ------- / _____/ ____/ _  \\/ / _/_/ ___  /   |    / / \n' +
-                '    ---- / / ___/ /__ / /_/ / /_/_// /  / / /| |   / / \n' +
-                ' ------ / / /  / ___//    _/  __ \\/ /  / / / | |  / /   \n' +
-                '  ---- / /__/ / /___/  \\ \\/ /  / / /__/ / /  | | / /    \n' +
-                '------ \\_____/_____/__/__/_/  /_/______/ /   | |/ /     \n'+
-                '________________________________________/    |___/ \n';
-
-    console.log(chalk.green(logo));
+	var logo =
+`           \_________________  __   ____________      __
+  ------- \/ _____/ ____/ _  \\/ / _/_/ ___  /   |    / /
+    ---- \/ \/ ___/ /__ / /_/ / /_/_// /  / / /| |   / /
+ ------ \/ / /  / ___//    _/  __ \\/ /  / / / | |  / /
+  ---- / /__/ / /___/  \\ \\/ /  / / /__/ / /  | | / /
+------ \\\_____/_____/__/__/_/  /_/______/ /   | |/ /
+\_\_______________________________________/    |___/
+`;
+	console.log(chalk.green(logo));
 }
 
 module.exports = Gerkon;
