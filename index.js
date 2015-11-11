@@ -386,7 +386,7 @@ function _onRequest(req, res){
 	const rule = _getRuleForPath(req.url, req.method);
 
 	//add request method and url to log string
-	log = `${req.method} ${req.url}`;
+	log = `${req.method} ${req.url} `;
 
 	_runMediators(req, res)
 		.then(() =>{
