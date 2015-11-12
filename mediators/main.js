@@ -10,7 +10,7 @@ module.exports = function (req, res, next) {
 function cookies(req) {
 	return new Promise((resolve, reject) => {
 		var cookies = {},
-			cookiePairs = req.headers.cookie.split(/;\s*/);
+			cookiePairs = (req.headers.cookie || '').split(/;\s*/);
 
 		cookiePairs.forEach((cookiePair) => {
 			var cookie = cookiePair.split('=');
