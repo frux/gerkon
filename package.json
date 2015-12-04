@@ -18,8 +18,8 @@
     "seenk": "^0.2.1"
   },
   "devDependencies": {
-    "got": "^4.2.0",
-    "istanbul": "^0.3.22",
+    "got": "^5.2.0",
+    "istanbul": "^0.4.1",
     "istanbul-coveralls": "^1.0.3",
     "mocha": "^2.3.2"
   }
