@@ -4,7 +4,7 @@
  */
 
 const chalk = require('chalk');
-let logsEnabled = true,
+let logsEnabled = false,
     profilingStartTime;
 
 /**
@@ -115,19 +115,16 @@ module.exports = {
 	enable,
 	disable,
 	info: function(text){
-		this.print(`${chalk.blue.inverse('INFO')}    ${text}`);
+		print(`${chalk.blue.inverse('INFO')}    ${text}`);
 	},
 	warn: function(text){
-		this.print(`${chalk.yellow.inverse('WARN')}    ${text}`);
-	},
-	verbose: function(text){
-		this.print(`${chalk.magenta.inverse('ERROR')}   ${text}`);
+		print(`${chalk.yellow.inverse('WARN')}    ${text}`);
 	},
 	log: function(text){
-		this.print(text);
+		print(text);
 	},
 	error: function(text){
-		console.log(`${chalk.red.inverse('ERROR')}   ${text}`);
+		print(`${chalk.red.inverse('ERROR')}   ${text}`);
 		return Error(text);
 	}
 };

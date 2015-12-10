@@ -102,7 +102,7 @@ function responseOutput(res){
 					if(!err){
 
 						//add header
-						this.writeHead(200, { 'Content-type': mime });
+						this.writeHead(200, {'Content-type': mime});
 
 						//write file content
 						this.write(data);

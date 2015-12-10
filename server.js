@@ -12,23 +12,26 @@ var http = require('http'),
 function start(port, requestHandler){
 	return new Promise((resolve, reject) => {
 
-		//throw error if port is not specified
-		if(isNaN(port)){
-			return reject('Port is not specified');
-		}
-
 		//if handler is a function
 		if(typeof requestHandler === 'function'){
 			//create new server
-			resolve(http.createServer((req, res) =>
+			this.server = http.createServer((req, res) =>
 					requestHandler(req, res))
-				.listen(port));
-		}else{
-			return reject(`requestHandler must be a function instead of ${typeof requestHandler}`);
+				.listen(port);
+
+			resolve(this.server);
 		}
 	});
 }
 
+/**
+ * Stops listening server
+ */
+function stop(){
+	this.server && this.server.close();
+}
+
 module.exports = {
-	start
+	start,
+	stop
 };

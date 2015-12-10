@@ -6,7 +6,10 @@
 
 const Gerkon = {
 	init,
+	stop,
+	reset,
 	route,
+	getRoutes,
 	mediator,
 	setConfig,
 	param
@@ -36,7 +39,7 @@ function init(){
 	Gerkon.mediator(require('./mediators/main.js'));
 
 	//if param `logs` was set to false diable logging
-	!_getParam('logs') && Logs.disable();
+	_getParam('logs') && Logs.enable();
 
 	//check port and set default
 	if(!_getParam('port')){
@@ -52,10 +55,25 @@ function init(){
 
 			//notify about server starting
 			Logs.info(`Gerkon has started to listen on ${chalk.blue('localhost:' + _getParam('port'))}`);
-		})
-		.catch((err) => {
-			throw Logs.error(err);
 		});
+}
+
+/**
+ * Stops Gerkon server
+ */
+function stop(){
+	Server.stop();
+}
+
+/**
+ * Stops Gerkon server and reset all configs, mediators and routes
+ */
+function reset(){
+	stop();
+	Logs.disable();
+	config = {};
+	routes = new Map();
+	mediators = [];
 }
 
 /* Routing */
@@ -68,7 +86,7 @@ function init(){
  * @returns {Gerkon}
  */
 function route(method, rule, controllers){
-	let _rule = rule,
+	let _rule,
 		route,
 		methods,
 		paramsNames;
@@ -80,8 +98,8 @@ function route(method, rule, controllers){
 		methods = [ 'GET', 'POST', 'PUT', 'DELETE', 'HEAD' ];
 
 		//and shift arguments
-		controllers = _rule;
-		_rule = method;
+		controllers = rule;
+		rule = method;
 
 		//if method specified as array
 	}else if(method instanceof Array){
@@ -95,6 +113,8 @@ function route(method, rule, controllers){
 		//wrap it in array
 		methods = [ method.toUpperCase() ];
 	}
+
+	_rule = rule;
 
 	//if rule is a string
 	if(typeof _rule === 'string'){
@@ -129,7 +149,7 @@ function route(method, rule, controllers){
 		}
 
 		//if the same route is not exists
-		if(!routes.has(_rule)){
+		if(!routes.has(rule)){
 
 			if(controllers instanceof Array){
 
@@ -140,7 +160,8 @@ function route(method, rule, controllers){
 				//make a route object
 				route = {
 					controllers: controllers,
-					methods: methods
+					methods: methods,
+					rule: _rule
 				};
 
 				//if there are params in a rule was found
@@ -157,7 +178,7 @@ function route(method, rule, controllers){
 				}
 
 				//add this route to other routes
-				routes.set(_rule, route);
+				routes.set(rule, route);
 
 			}else{
 				throw Logs.error('controllers must be a function or an array of functions');
@@ -167,9 +188,25 @@ function route(method, rule, controllers){
 		}else{
 			throw Logs.error(`Route already exists (${rule})`);
 		}
+	}else{
+		throw Logs.error(`Rule must be a string not a ${typeof rule}`);
 	}
 
 	return this;
+}
+
+/**
+ * Returns array of rules
+ * @returns {Array}
+ */
+function getRoutes(){
+	let routesList = [];
+
+	for(let routeName of routes.keys()){
+		routesList.push(routeName);
+	}
+
+	return routesList;
 }
 
 /**
@@ -179,11 +216,6 @@ function route(method, rule, controllers){
  * @private
  */
 function _wrapAsync(syncFunction){
-
-	//if controller is a function
-	if(typeof syncFunction !== 'function'){
-		return;
-	}
 
 	//wrap it
 	return (req, res) => new Promise(function(resolve, reject){
@@ -203,20 +235,21 @@ function _getRuleForPath(path, method){
 		methodAccepted,
 		notAsterisk;
 
-	for(let rule of routes.keys()){
+	for(let routeName of routes.keys()){
+		let route = routes.get(routeName);
 
 		//url match to the rule
-		regExpPassed = rule.test(path);
+		regExpPassed = route.rule.test(path);
 
 		//request method accepted by this rule
-		methodAccepted = (routes.get(rule).methods.indexOf(method.toUpperCase()) > -1);
+		methodAccepted = (route.methods.indexOf(method.toUpperCase()) > -1);
 
 		//rule is not a just asterisk (*)
-		notAsterisk = (rule !== ASTERISK);
+		notAsterisk = (route.rule !== ASTERISK);
 
 		//if this rule pass all conditions return it
 		if(regExpPassed && methodAccepted && notAsterisk){
-			return rule;
+			return routeName;
 		}
 	}
 }
@@ -224,15 +257,15 @@ function _getRuleForPath(path, method){
 /**
  * Extract params values from path by specified rule
  * @param path {string} Path
- * @param rule {string} Rule
+ * @param routeName {string} Route name
  * @returns {object}
  * @private
  */
-function _parseParams(path, rule){
+function _parseParams(path, routeName){
 	var params = {},
 
 		//get route of this rule
-		route = routes.get(rule),
+		route = routes.get(routeName),
 		max = route.paramsNames.length,
 		parsedParams;
 
@@ -240,7 +273,7 @@ function _parseParams(path, rule){
 	if(max){
 
 		//if params extracted successfully
-		if(parsedParams = rule.exec(path)){
+		if(parsedParams = route.rule.exec(path)){
 
 			//delete first value
 			parsedParams.shift();
@@ -257,18 +290,18 @@ function _parseParams(path, rule){
 
 /**
  * Run route controller
- * @param rule {string} Route rule
+ * @param routeName {string} Route name
  * @param req {object} Request object
  * @param res {object} Response object
  * @private
  */
-function _handleRoute(rule, req, res){
-	var controllers = routes.get(rule).controllers,
+function _handleRoute(routeName, req, res){
+	var controllers = routes.get(routeName).controllers,
 		max = controllers.length,
 		i;
 
 	//parse params from path
-	req.params = _parseParams(req.url, rule);
+	req.params = _parseParams(req.url, routeName);
 
 	//exec each controller
 	return Seenk(function*(){
@@ -314,13 +347,13 @@ function _outputFileData(path, req, res){
  */
 function _404(req, res){
 	return new Promise(function(resolve, reject){
-		var asteriskRoute = routes.get(ASTERISK);
+		var asteriskRoute = routes.get('*');
 
 		//if asterisk route defined
 		if(asteriskRoute){
 
 			//run handling asterisk
-			_handleRoute(ASTERISK, req, res)
+			_handleRoute('*', req, res)
 				.then(() => resolve(404));
 
 		//if asterisk route is not defined send 404
@@ -383,7 +416,7 @@ function _onRequest(req, res){
 	Logs.startProfiling();
 
 	//get a rule for path
-	const rule = _getRuleForPath(req.url, req.method);
+	const routeName = _getRuleForPath(req.url, req.method);
 
 	//add request method and url to log string
 	log = `${req.method} ${req.url} `;
@@ -391,10 +424,10 @@ function _onRequest(req, res){
 	_runMediators(req, res)
 		.then(() =>{
 			//if url matches to any rule
-			if(rule){
+			if(routeName){
 
 				//run handling of this route
-				_handleRoute(rule, req, res)
+				_handleRoute(routeName, req, res)
 					.then((statusCode) => Logs.logRequest(res.statusCode, log))
 					.catch((err) => _502(req, res, err));
 
