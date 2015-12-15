@@ -89,7 +89,7 @@ function logRequest(statusCode, method, url){
 		}
 
 		//output log
-		print('NONE', `${chalk[logColor](sign + statusCode)} ${method} ${url} ${time}ms`);
+		print('NONE', `${chalk[logColor](sign + statusCode)} ${method} ${url} ${responseTime}ms`);
 	}
 }
 
