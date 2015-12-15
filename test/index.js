@@ -271,6 +271,25 @@ describe('Logs', () => {
 		Logs.warn('test');
 		Logs.log('test');
 		Logs.print('test');
+		Logs.logRequest(200, 'POST', '/');
+		Logs.logRequest(404, 'GET', '/');
+		Logs.logRequest(302, 'DELETE', '/');
+		Logs.logRequest(502, 'PUT', '/');
+		global.console.log = consoleLogBackup.bind(global.console);
+	});
+
+	it('should output logs in JSON format', () => {
+		global.console.log = function(){};
+		Logs.enable('json');
+		Logs.info('test');
+		Logs.error('test');
+		Logs.warn('test');
+		Logs.log('test');
+		Logs.print('test');
+		Logs.logRequest(200, 'POST', '/');
+		Logs.logRequest(404, 'GET', '/');
+		Logs.logRequest(302, 'DELETE', '/');
+		Logs.logRequest(502, 'PUT', '/');
 		global.console.log = consoleLogBackup.bind(global.console);
 	});
 });
