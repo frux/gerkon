@@ -1,7 +1,7 @@
 'use strict';
 /**
  * Gerkon
- * @version 0.0.1
+ * @version 1.1.0
  */
 
 const Gerkon = {
@@ -39,7 +39,7 @@ function init(){
 	Gerkon.mediator(require('./mediators/main.js'));
 
 	//if param `logs` was set to false diable logging
-	_getParam('logs') && Logs.enable();
+	_getParam('logs') && Logs.enable(_getParam('logs'));
 
 	//check port and set default
 	if(!_getParam('port')){
@@ -366,7 +366,7 @@ function _404(req, res){
 			res.statusCode = 404;
 
 			//output log
-			Logs.logRequest(404, `${req.method} ${req.url} `);
+			Logs.logRequest(404, req.method, req.url);
 
 			resolve(404);
 		}
@@ -391,7 +391,7 @@ function _502(req, res, err){
 		res.statusCode = 502;
 
 		//output log
-		Logs.logRequest(502, `${req.method} ${req.url} `);
+		Logs.logRequest(502, req.method, req.url);
 
 		//output error
 		Logs.error(err.stack);
@@ -418,9 +418,6 @@ function _onRequest(req, res){
 	//get a rule for path
 	const routeName = _getRuleForPath(req.url, req.method);
 
-	//add request method and url to log string
-	log = `${req.method} ${req.url} `;
-
 	_runMediators(req, res)
 		.then(() =>{
 			//if url matches to any rule
@@ -428,7 +425,9 @@ function _onRequest(req, res){
 
 				//run handling of this route
 				_handleRoute(routeName, req, res)
-					.then((statusCode) => Logs.logRequest(res.statusCode, log))
+					.then((statusCode) => {
+						Logs.logRequest(statusCode, req.method, req.url)
+					})
 					.catch((err) => _502(req, res, err));
 
 				//if url is not matching to any rule

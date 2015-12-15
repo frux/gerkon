@@ -4,7 +4,13 @@
  */
 
 const chalk = require('chalk');
-let logsEnabled = false,
+const logLevels = {
+	INFO: { color: 'blue', prefix: '', suffix: ' ' },
+	WARN: { color: 'yellow', prefix: '', suffix: ' ' },
+	ERROR: { color: 'red', prefix: '', suffix: '' },
+	NONE: { color: 'gray', prefix: '', suffix: ' '}
+};
+let logsMode = false, //'string' or 'json' === enabled, false === disabled
     profilingStartTime;
 
 /**
@@ -14,62 +20,77 @@ let logsEnabled = false,
  */
 function _getTime(){
 
-	//get current date
-	const currentDate = new Date();
+	if(logsMode === 'json'){
+		return (new Date).toJSON();
+	}else if(logsMode === 'string'){
 
-	//get hours
-	const hours = currentDate.getHours();
+		//get current date
+		const currentDate = new Date();
 
-	//get minutes
-	const minutes = currentDate.getMinutes();
+		//get hours
+		const hours = currentDate.getHours();
 
-	//get seconds
-	const seconds = currentDate.getSeconds();
+		//get minutes
+		const minutes = currentDate.getMinutes();
 
-	//build time string
-	return (hours < 10 ? '0' : '') + hours + ':' + (minutes < 10 ? '0' : '') + minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+		//get seconds
+		const seconds = currentDate.getSeconds();
+
+		//build time string
+		return (hours < 10 ? '0' : '') + hours + ':' + (minutes < 10 ? '0' : '') + minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+	}
 }
 
 /**
  * Outputs text to the console
+ * @param levelName {string} Name of log level
  * @param text {string} Text to output to the console
  */
-function print(text){
-	if(logsEnabled){
-		//output time at the start of the console string
-		text = chalk.gray(_getTime()) + ' ' + text;
+function print(levelName, text){
+	if(logsMode === 'json'){
+		console.log(JSON.stringify({name: 'LOG', time: _getTime(), level: levelName, text: text}));
+	}else if(logsMode === 'string'){
+		if(!logLevels.hasOwnProperty(levelName)){
+			levelName = 'NONE';
+		}
 
-		//output it
-		console.log(text);
+		const level = logLevels[levelName];
+
+		console.log(`${_getTime()} ${level.prefix}${chalk[level.color](levelName)}${level.suffix} ${text}`);
 	}
 }
 
 /**
  * Output log of request
  * @param statusCode {number} Request status code
- * @param log {string} Log string
+ * @param method {string} Request method
+ * @param url {string} Request URL
  * @private
  */
-function logRequest(statusCode, log){
+function logRequest(statusCode, method, url){
+	const responseTime = stopProfiling();
 	let logColor,
 	    sign;
 
-	log += `${stopProfiling()}ms`;
+	if(logsMode === 'json'){
+		console.log(JSON.stringify({name: 'REQUEST', time: _getTime(), statusCode, responseTime, method, url}));
+	}else if(logsMode === 'string'){
 
-	//choose color in order to status code
-	if(statusCode >= 500){
-		logColor = 'red';
-		sign = '✘ ';
-	}else if(statusCode >= 300){
-		logColor = 'yellow';
-		sign = '● ';
-	}else{
-		logColor = 'green';
-		sign = '✓ ';
+		//choose color in order to status code
+		if(statusCode >= 500){
+			logColor = 'red';
+			sign = '✘ ';
+		}else if(statusCode >= 300){
+			logColor = 'yellow';
+			sign = '● ';
+		}else{
+			logColor = 'green';
+			sign = '✓ ';
+		}
+
+		//output log
+		print('NONE', `${chalk[logColor](sign + statusCode)} ${method} ${url} ${time}ms`);
 	}
-
-	//output log
-	this.log(`${chalk[ logColor ](sign + statusCode)} ${log}`);
 }
 
 /* Profiling */
@@ -91,11 +112,12 @@ function stopProfiling(){
 
 /**
  * Enables logging
+ * @param mode {string} Logs format 'string' or 'json'. Default: 'string'
  */
-function enable(){
+function enable(mode){
 
 	//no comments
-	logsEnabled = true;
+	logsMode = (mode === 'json' ? 'json' : 'string');
 }
 
 /**
@@ -104,7 +126,7 @@ function enable(){
 function disable(){
 
 	//no comments
-	logsEnabled = false;
+	logsMode = false;
 }
 
 module.exports = {
@@ -115,16 +137,16 @@ module.exports = {
 	enable,
 	disable,
 	info: function(text){
-		print(`${chalk.blue.inverse('INFO')}    ${text}`);
+		print('INFO', text);
 	},
 	warn: function(text){
-		print(`${chalk.yellow.inverse('WARN')}    ${text}`);
+		print('WARN', text);
 	},
 	log: function(text){
-		print(text);
+		print('NONE', text);
 	},
 	error: function(text){
-		print(`${chalk.red.inverse('ERROR')}   ${text}`);
+		print('ERROR', text);
 		return Error(text);
 	}
 };
