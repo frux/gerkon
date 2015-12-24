@@ -32,6 +32,8 @@ function responseOutput(res){
 		 */
 		res.send = function(data){
 
+			this.writeHead(200, {'Content-Type':'text/html'});
+
 			//write data to response
 			this.write(data);
 
