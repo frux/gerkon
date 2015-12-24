@@ -425,8 +425,8 @@ function _onRequest(req, res){
 
 				//run handling of this route
 				_handleRoute(routeName, req, res)
-					.then((statusCode) => {
-						Logs.logRequest(statusCode, req.method, req.url)
+					.then(() => {
+						Logs.logRequest(200, req.method, req.url)
 					})
 					.catch((err) => _502(req, res, err));
 
