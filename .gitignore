@@ -5,4 +5,5 @@ atlassian-ide-plugin.xml
 .npmrc
 page/
 coverage/
+monkey.js
 npm-debug.log
