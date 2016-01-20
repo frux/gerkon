@@ -1,558 +1,335 @@
 'use strict';
-/**
- * Gerkon
- * @version 1.1.1
- */
 
-const Gerkon = {
-	init,
-	stop,
-	reset,
-	route,
-	getRoutes,
-	mediator,
-	setConfig,
-	param
-};
-
-const Server = require('./server');
-const Logs = require('./logs');
-const Seenk = require('seenk');
-const chalk = require('chalk');
-const fs = require('fs');
-const ASTERISK = new RegExp('^\\S{0,}$', 'i');
-
-let config = {},
-	routes = new Map(),
-	mediators = [];
+const seenk = require('seenk'),
+	  http = require('http');
 
 /**
- * Inititalize Gerkon
- * @returns {Promise}
+ * Gerkon class
+ * @constructor
  */
-function init(){
+function Gerkon(){
+	const routes = {
+		get: new Map(),
+		post: new Map(),
+		put: new Map(),
+		head: new Map(),
+		delete: new Map()
+	};
+	let server;
 
-	//show Gerkon logo
-	_getParam('logo') && _printLogo();
+	/**
+	 * Request handler
+	 * @param req {object} Request object
+	 * @param res {object} Response object
+	 * @private
+	 */
+	function _onRequest(req, res){
+		const method = req.method.toLowerCase(),
+			  url = req.url,
+			  rule = _findRoute(routes[method], url),
+			  route = routes[method].get(rule);
 
-	//connect mediators
-	Gerkon.mediator(require('./mediators/main.js'));
+		if(route){
+			if(route.params.length){
+				req.params = _parseParams(route, url);
+			}else{
+				req.params = {};
+			}
 
-	//if param `logs` was set to false diable logging
-	_getParam('logs') && Logs.enable(_getParam('logs'));
-
-	//check port and set default
-	if(!_getParam('port')){
-		_setParam('port', 8080);
-		Logs.warn('Port was not specified. Gerkon is using default 8080.');
+			_execRoute(route, req, res)
+				.then(() => {})
+				.catch(() => _on502(req, res));
+		}else{
+			_on404(req, res);
+		}
 	}
 
-	//start the server
-	return Server.start(_getParam('port'), (req, res) => {
-			_onRequest(req, res);
-		})
-		.then(() => {
+	/**
+	 * Starts to listen specified port
+	 * @param port {number} Port number
+	 * @return {Gerkon}
+	 * @method
+	 */
+	this.listen = function(port){
+		server = _startServer(port, _onRequest);
+		return this;
+	};
 
-			//notify about server starting
-			Logs.info(`Gerkon has started to listen on ${chalk.blue('localhost:' + _getParam('port'))}`);
-		});
-}
+	/**
+	 * Stops Gerkon server
+	 * @return {Gerkon}
+	 * @method
+	 */
+	this.stop = function(){
+		_stopServer(server);
+		return this;
+	};
 
-/**
- * Stops Gerkon server
- */
-function stop(){
-	Server.stop();
-}
+	/**
+	 * Adds a route
+	 * @param method {string|Array} Request method or an array of methods
+	 * @param rule {string} Route rule
+	 * @param controllers {function|Array} Controller or array of controllers
+	 * @returns {Gerkon}
+	 * @method
+	 */
+	this.route = function(method, rule, controllers){
+		let newRoute = {};
 
-/**
- * Stops Gerkon server and reset all configs, mediators and routes
- */
-function reset(){
-	stop();
-	Logs.disable();
-	config = {};
-	routes = new Map();
-	mediators = [];
-}
+		if(arguments.length === 2 && typeof arguments[1] === 'function'){
+			controllers = rule;
+			rule = method;
+			method = ['GET', 'POST', 'PUT', 'HEAD', 'DELETE'];
+		}
 
-/* Routing */
-
-/**
- * Add route
- * @param method {string|Array|undefined} Available request method or methods
- * @param rule {string} Route`s rule
- * @param controllers {function|Array} Route controller or array of controllers
- * @returns {Gerkon}
- */
-function route(method, rule, controllers){
-	let _rule,
-		route,
-		methods,
-		paramsNames;
-
-	//if method is not specified
-	if(arguments.length === 2){
-
-		//set all available methods
-		methods = [ 'GET', 'POST', 'PUT', 'DELETE', 'HEAD' ];
-
-		//and shift arguments
-		controllers = rule;
-		rule = method;
-
-		//if method specified as array
-	}else if(method instanceof Array){
-
-		//just assign it
-		methods = method;
-
-		//if specified one method only
-	}else{
-
-		//wrap it in array
-		methods = [ method.toUpperCase() ];
-	}
-
-	_rule = rule;
-
-	//if rule is a string
-	if(typeof _rule === 'string'){
+		if(method instanceof Array){
+			method.forEach(singleMethod => {
+				this.route(singleMethod, rule, controllers);
+			});
+			return this;
+		}
 
 		if(typeof controllers === 'function'){
-			controllers = [ controllers ];
+			controllers = [controllers];
 		}
 
-		if(_rule === '*'){
-			_rule = ASTERISK;
-		}else{
-
-			// escape "?" symbol
-			_rule = _rule.replace('?', '\?');
-
-			// handle optional symbols {}
-			_rule = _rule.replace(/\{(.*)\}/g, '(?:$1){0,1}');
-
-			//handle "Any" symbol "*"
-			_rule = _rule.replace('*', '\\S{0,}');
-
-			//find all params in url template
-			paramsNames = _rule.match(/\<([a-zA-Z0-9\_\-]{1,})\>/g) || [];
-
-			//handle params "catching"
-			_rule = _rule.replace(/\<([a-zA-Z0-9\_\-]{1,})\>/g, '([^\/]{1,})');
-
-			//escape "/" symbol
-			_rule = _rule.replace(/\//g, '\\/');
-
-			_rule = new RegExp('^' + _rule + '$', 'i');
+		if(typeof method !== 'string'){
+			throw Error('Request method must be a string');
+		}
+		if(typeof rule !== 'string'){
+			throw Error('Route rule must be a string');
+		}
+		if(!(controllers instanceof Array)){
+			throw Error('Controller must be a function or an array of functions');
 		}
 
-		//if the same route is not exists
-		if(!routes.has(rule)){
+		method = method.toLowerCase();
 
-			if(controllers instanceof Array){
+		if(method in routes){
+			if(!routes[method].has(rule)){
+				newRoute.method = method;
+				newRoute.params = _fetchParamNames(rule);
+				newRoute.rule = _ruleToRegExp(rule);
 
-				//wrap each asynchronous controller into Promise
-				controllers = controllers.map((controller) =>
-					(controller.length > 2 ? _wrapAsync(controller) : controller));
+				// wrap async controllers into Promise
+				newRoute.controllers = controllers.map(controller => {
+					if(controller.length > 2){
+						return function(req, res){
+							return new Promise(resolve => {
+								controller(req, res, resolve);
+							});
+						};
+					}
+					return controller;
+				});
 
-				//make a route object
-				route = {
-					controllers: controllers,
-					methods: methods,
-					rule: _rule
-				};
-
-				//if there are params in a rule was found
-				if(paramsNames){
-
-					//remember list of parameters names
-					route.paramsNames = paramsNames.map((param) =>
-
-						//RegExp found parameters names wrapped in <>. Remove brackets.
-						param.substr(1, param.length - 2)
-					);
-				}else{
-					route.paramsNames = [];
-				}
-
-				//add this route to other routes
-				routes.set(rule, route);
-
+				routes[method].set(rule, newRoute);
 			}else{
-				throw Logs.error('controllers must be a function or an array of functions');
+				throw Error('Route already exists');
 			}
-
-			//if the same route is exists throw error
 		}else{
-			throw Logs.error(`Route already exists (${rule})`);
+			throw Error(`Invalid request method: ${method}`);
 		}
-	}else{
-		throw Logs.error(`Rule must be a string not a ${typeof rule}`);
-	}
-
-	return this;
-}
-
-/**
- * Returns array of rules
- * @returns {Array}
- */
-function getRoutes(){
-	let routesList = [];
-
-	for(let routeName of routes.keys()){
-		routesList.push(routeName);
-	}
-
-	return routesList;
-}
-
-/**
- * Wrap controller into async function returning Promise
- * @param syncFunction {function} Some synchronous function
- * @returns {function}
- * @private
- */
-function _wrapAsync(syncFunction){
-
-	//wrap it
-	return (req, res) => new Promise(function(resolve, reject){
-		syncFunction(req, res, resolve);
-	});
-}
-
-/**
- * Looks for rule matching the path
- * @param path {string} Path a rule should matches to
- * @param method {string} Request method
- * @returns {string}
- * @private
- */
-function _getRuleForPath(path, method){
-	var regExpPassed,
-		methodAccepted,
-		notAsterisk;
-
-	for(let routeName of routes.keys()){
-		let route = routes.get(routeName);
-
-		//url match to the rule
-		regExpPassed = route.rule.test(path);
-
-		//request method accepted by this rule
-		methodAccepted = (route.methods.indexOf(method.toUpperCase()) > -1);
-
-		//rule is not a just asterisk (*)
-		notAsterisk = (route.rule !== ASTERISK);
-
-		//if this rule pass all conditions return it
-		if(regExpPassed && methodAccepted && notAsterisk){
-			return routeName;
-		}
-	}
-}
-
-/**
- * Extract params values from path by specified rule
- * @param path {string} Path
- * @param routeName {string} Route name
- * @returns {object}
- * @private
- */
-function _parseParams(path, routeName){
-	var params = {},
-
-		//get route of this rule
-		route = routes.get(routeName),
-		max = route.paramsNames.length,
-		parsedParams;
-
-	//if this rule have params
-	if(max){
-
-		//if params extracted successfully
-		if(parsedParams = route.rule.exec(path)){
-
-			//delete first value
-			parsedParams.shift();
-
-			//assign each param value to its name
-			for(let i = 0; i < max; i++){
-				params[ route.paramsNames[ i ] ] = parsedParams[ i ];
-			}
-		}
-	}
-
-	return params;
-}
-
-/**
- * Run route controller
- * @param routeName {string} Route name
- * @param req {object} Request object
- * @param res {object} Response object
- * @private
- */
-function _handleRoute(routeName, req, res){
-	var controllers = routes.get(routeName).controllers,
-		max = controllers.length,
-		i;
-
-	//parse params from path
-	req.params = _parseParams(req.url, routeName);
-
-	//exec each controller
-	return Seenk(function*(){
-		for(i = 0; i < max; i++){
-			yield controllers[ i ](req, res);
-		}
-	});
-}
-
-/**
- * Finds and outputs file
- * @param path {string} File path
- * @param req {object} Requset object
- * @param res {object} Response object
- * @returns {Promise}
- * @private
- */
-function _outputFileData(path, req, res){
-
-	return new Promise(function(resolve, reject){
-
-		//try to read file
-		fs.readFile(path, function(err, data){
-
-			//reject if failed
-			if(err){
-				return reject(err);
-			}
-
-			//if reading is success send file content
-			resolve(data);
-		});
-	});
-
-}
-
-/**
- * Tries to handle asterisk route else just sends 404 status code
- * @param req {object} Request object
- * @param res {object} Response object
- * @returns {Promise}
- * @private
- */
-function _404(req, res){
-	return new Promise(function(resolve, reject){
-		var asteriskRoute = routes.get('*');
-
-		//if asterisk route defined
-		if(asteriskRoute){
-
-			//run handling asterisk
-			_handleRoute('*', req, res)
-				.then(() => resolve(404));
-
-		//if asterisk route is not defined send 404
-		}else{
-
-			//send response
-			res.sendCode(404, 'Error 404. The requested page is not found.');
-
-			//set status code
-			res.statusCode = 404;
-
-			//output log
-			Logs.logRequest(404, req.method, req.url);
-
-			resolve(404);
-		}
-	});
-}
-
-/**
- * Sends 502 status code
- * @param req {object} Requset object
- * @param res {object} Response object
- * @param err {object} Error object
- * @returns {Promise}
- * @private
- */
-function _502(req, res, err){
-	return new Promise(function(resolve, reject){
-
-		//send response
-		res.sendCode(502, 'Error 502. Server error.');
-
-		//set status code
-		res.statusCode = 502;
-
-		//output log
-		Logs.logRequest(502, req.method, req.url);
-
-		//output error
-		Logs.error(err.stack);
-
-		//reject promise
-		return resolve(502);
-	});
-}
-
-/* END: Routing */
-
-/**
- * Handles every request
- * @param req {object} Request object
- * @param res {object} Response object
- * @private
- */
-function _onRequest(req, res){
-	let log;
-
-	//start profiling
-	Logs.startProfiling();
-
-	//get a rule for path
-	const routeName = _getRuleForPath(req.url, req.method);
-
-	_runMediators(req, res)
-		.then(() =>{
-			//if url matches to any rule
-			if(routeName){
-
-				//run handling of this route
-				_handleRoute(routeName, req, res)
-					.then(() => {
-						Logs.logRequest(200, req.method, req.url)
-					})
-					.catch((err) => _502(req, res, err));
-
-				//if url is not matching to any rule
-			}else if(_getParam('static.path')){
-
-				//try to find and output static file
-				_outputFileData((_getParam('static.path') + req.url), req, res)
-					.then((fileData) => res.send(fileData))
-					.catch((err) => _404(req, res));
-			}else{
-				_404(req, res);
-			}
-		});
-}
-
-/* Mediators */
-
-/**
- * Add mediator
- * @param mediator {function} Mediator function
- * @returns {Gerkon}
- */
-function mediator(mediator){
-	if(typeof mediator === 'function'){
-		if(mediator.length > 2){
-			mediator = _wrapAsync(mediator);
-		}
-
-		mediators.push(mediator);
-	}
-
-	return this;
-}
-
-/**
- * Run all connected mediators
- * @param req {object} Req object
- * @param res {object} Res object
- * @returns {*}
- * @private
- */
-function _runMediators(req, res){
-	var max = mediators.length,
-		i;
-
-	return Seenk(function*(){
-		for(i = 0; i < max; i++){
-			yield mediators[ i ](req, res);
-		}
-	});
-}
-
-/* END: Mediators */
-
-
-/* Params */
-
-/**
- * Overwrite config
- * @param newConfig {object} New config
- * @returns {Gerkon}
- */
-function setConfig(newConfig){
-	(typeof newConfig === 'object') && (config = newConfig);
-
-	return this;
-}
-
-/**
- * Set config param
- * @param paramName {string} Param name
- * @param paramValue {*} Param value
- */
-function _setParam(paramName, paramValue){
-	config[ paramName ] = paramValue;
-}
-
-/**
- * Get config param value
- * @param paramName {string} Param name
- * @returns {*}
- */
-function _getParam(paramName){
-	return config[ paramName ];
-}
-
-/**
- * Param getter/setter
- * @param paramName {string} Param name you want to get/set
- * @param paramValue {*|undefined} Param value for using as setter
- * @returns {*}
- */
-function param(paramName, paramValue){
-
-	//param value provided
-	if(typeof paramValue !== 'undefined'){
-
-		//set it
-		_setParam(paramName, paramValue);
-
-		//return this for chaining
 		return this;
-	}
+	};
 
-	//if value is not provided just return param current value
-	return _getParam(paramName);
+	/**
+	 * Returns list of routes for specified request method
+	 * @param method {string} Request method
+	 * @return {Array}
+	 */
+	this.getRoutes = function(method){
+		let result = [];
+
+		if(method in routes){
+			routes[method].forEach((route, rule) => {
+				result.push(rule);
+			});
+		}
+
+		return result;
+	};
 }
 
-/* END: Params */
+/**
+ * Adds a GET route
+ * @param rule {string} Route rule
+ * @param controllers {function|Array} Controller or array of controllers
+ * @returns {Gerkon}
+ */
+Gerkon.prototype.get = function(rule, controllers){
+	return this.route('get', rule, controllers);
+};
 
 /**
- * Prints Gerkon logo if config param showLogo is true
+ * Adds a GET route
+ * @param rule {string} Route rule
+ * @param controllers {function|Array} Controller or array of controllers
+ * @returns {Gerkon}
+ */
+Gerkon.prototype.post = function(rule, controllers){
+	return this.route('post', rule, controllers);
+};
+
+/**
+ * Checks if url matchs to the rule
+ * @param rule {string|RegExp} Gerkon routing rule
+ * @param url {string} Url to check
+ * @returns {Boolean}
+ * @static
+ */
+Gerkon.match = function(rule, url){
+	if(typeof rule === 'string'){
+		rule = _ruleToRegExp(rule);
+	}
+	if(!(rule instanceof RegExp && typeof url === 'string')){
+		throw Error('Rule must be a string or RegExp. Url must be a string.');
+	}
+
+	return rule.test(url);
+};
+
+/**
+ * Starts http server
+ * @param  port {number} Port number
+ * @param  requestHandler {function} Request handler
+ * @returns {http.Server} Server instance
+ * @this {Gerkon}
  * @private
  */
-function _printLogo(){
-	var logo =
-`           \_________________  __   ____________      __
-  ------- \/ _____/ ____/ _  \\/ / _/_/ ___  /   |    / /
-    ---- \/ \/ ___/ /__ / /_/ / /_/_// /  / / /| |   / /
- ------ \/ / /  / ___//    _/  __ \\/ /  / / / | |  / /
-  ---- / /__/ / /___/  \\ \\/ /  / / /__/ / /  | | / /
------- \\\_____/_____/__/__/_/  /_/______/ /   | |/ /
-\_\_______________________________________/    |___/
-`;
-	console.log(chalk.green(logo));
+function _startServer(port, requestHandler){
+	if(isNaN(port)){
+		throw Error('Port must be a number');
+	}
+
+	return http
+		.createServer(requestHandler)
+		.listen(port);
+}
+
+/**
+ * Stops server
+ * @returns {Gerkon}
+ * @private
+ * @this {Gerkon}
+ */
+function _stopServer(serverInstance){
+	if(serverInstance instanceof http.Server){
+		serverInstance.close();
+	}
+}
+
+/**
+ * Fetches names of parameters from rule
+ * @param rule
+ * @returns {Array}
+ * @private
+ */
+function _fetchParamNames(rule){
+	let paramNames = [],
+		paramRegExp = /<([^\s\/]+?)>/ig,
+		name;
+
+	while((name = paramRegExp.exec(rule)) !== null){
+		paramNames.push(name[1]);
+	}
+
+	return paramNames;
+}
+
+/**
+ * Parse params from rule in order to route rule
+ * @param route {object} Route
+ * @param url {string} Url to parse params from
+ * @returns {object}
+ */
+function _parseParams(route, url){
+	let params = url.match(route.rule),
+		result = {};
+
+	params.shift();
+	for(let paramName of route.params){
+		result[paramName] = params.shift();
+	}
+
+	return result;
+}
+
+/**
+ * Converts Gerkon rule to regular expression
+ * @param rule {string} Source rule
+ * @return {RegExp}
+ * @private
+ */
+function _ruleToRegExp(rule){
+	return new RegExp(`^${rule
+
+		// escape regexp special symbols
+		.replace(/([\/\.\\\?\*\+\(\)\{\}\[\]\^\$])/ig, '\\$1')
+
+		// optional rule /foo{/bar}
+		.replace(/\\\{(.*)\\\}/ig, '(?:$1)?')
+
+		// any rule /test*
+		.replace(/\\\*/ig, '.*')
+
+		// params rule
+		.replace(/<([^\s\/]*)>/ig, '([^\/]+)')}$`, 'i');
+}
+
+/**
+ * Finds route matching specified method and url
+ * @param routes {Map} Map of available routes
+ * @param url {string} requested url
+ * @returns {string}
+ */
+function _findRoute(routes, url){
+	for(let rule of routes.keys()){
+		let route = routes.get(rule);
+		if(route.rule.test(url)){
+			return rule;
+		}
+	}
+}
+
+/**
+ * Handle route
+ * @param
+ */
+function _execRoute(route, req, res){
+	return seenk(function* (){
+		for(let controller of route.controllers){
+			yield controller(req, res);
+		}
+	});
+}
+
+/**
+ * Handle 404 error
+ * @param req {object} Request object
+ * @param res {object} Response object
+ */
+function _on404(req, res){
+	// TODO:404
+	res.writeHead(404, {
+		'Content-Type': 'text/plain'
+	});
+	res.write('Not found');
+	res.end();
+}
+
+/**
+ * Handle 502 error
+ * @param req {object} Request object
+ * @param res {object} Response object
+ */
+function _on502(req, res){
+	// TODO:502
+	res.writeHead(502, {
+		'Content-Type': 'text/plain'
+	});
+	res.write('Internal error');
+	res.end();
 }
 
 module.exports = Gerkon;
