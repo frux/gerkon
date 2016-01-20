@@ -9,7 +9,7 @@
     "lint": "./node_modules/.bin/eslint index.js",
     "coverage": "./node_modules/.bin/istanbul cover ./node_modules/.bin/_mocha",
     "coveralls": "./node_modules/.bin/istanbul-coveralls",
-		"prepush": "npm test"
+	"prepush": "npm test"
   },
   "author": "Vladimir Kudinov <qdinov@yandex.ru>",
   "license": "WTFPL",
