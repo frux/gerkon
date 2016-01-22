@@ -9,12 +9,14 @@ const seenk = require('seenk'),
  */
 function Gerkon(){
 	const routes = {
-		get: new Map(),
-		post: new Map(),
-		put: new Map(),
-		head: new Map(),
-		delete: new Map()
-	};
+			get: new Map(),
+			post: new Map(),
+			put: new Map(),
+			head: new Map(),
+			delete: new Map()
+		},
+		middlewares = new Set();
+
 	let server;
 
 	/**
@@ -25,23 +27,32 @@ function Gerkon(){
 	 */
 	function _onRequest(req, res){
 		const method = req.method.toLowerCase(),
-			  url = req.url,
-			  rule = _findRoute(routes[method], url),
-			  route = routes[method].get(rule);
+			url = req.url,
+			rule = _findRoute(routes[method], url),
+			route = routes[method].get(rule),
+			reqPromise = new Promise((resolve, reject) => {
+				res.on('finish', resolve);
+				res.on('error', reject);
+			});
 
-		if(route){
-			if(route.params.length){
-				req.params = _parseParams(route, url);
-			}else{
-				req.params = {};
-			}
+		_runMiddlewares(middlewares, reqPromise, req, res)
+			.then(() => {
+				if(route){
+					if(route.params.length){
+						req.params = _parseParams(route, url);
+					}else{
+						req.params = {};
+					}
 
-			_execRoute(route, req, res)
-				.then(() => {})
-				.catch(() => _on502(req, res));
-		}else{
-			_on404(req, res);
-		}
+					_execRoute(route, req, res)
+						.then(() => {})
+						.catch(() => {
+							_on502(req, res);
+						});
+				}else{
+					_on404(req, res);
+				}
+			});
 	}
 
 	/**
@@ -74,62 +85,7 @@ function Gerkon(){
 	 * @method
 	 */
 	this.route = function(method, rule, controllers){
-		let newRoute = {};
-
-		if(arguments.length === 2 && typeof arguments[1] === 'function'){
-			controllers = rule;
-			rule = method;
-			method = ['GET', 'POST', 'PUT', 'HEAD', 'DELETE'];
-		}
-
-		if(method instanceof Array){
-			method.forEach(singleMethod => {
-				this.route(singleMethod, rule, controllers);
-			});
-			return this;
-		}
-
-		if(typeof controllers === 'function'){
-			controllers = [controllers];
-		}
-
-		if(typeof method !== 'string'){
-			throw Error('Request method must be a string');
-		}
-		if(typeof rule !== 'string'){
-			throw Error('Route rule must be a string');
-		}
-		if(!(controllers instanceof Array)){
-			throw Error('Controller must be a function or an array of functions');
-		}
-
-		method = method.toLowerCase();
-
-		if(method in routes){
-			if(!routes[method].has(rule)){
-				newRoute.method = method;
-				newRoute.params = _fetchParamNames(rule);
-				newRoute.rule = _ruleToRegExp(rule);
-
-				// wrap async controllers into Promise
-				newRoute.controllers = controllers.map(controller => {
-					if(controller.length > 2){
-						return function(req, res){
-							return new Promise(resolve => {
-								controller(req, res, resolve);
-							});
-						};
-					}
-					return controller;
-				});
-
-				routes[method].set(rule, newRoute);
-			}else{
-				throw Error('Route already exists');
-			}
-		}else{
-			throw Error(`Invalid request method: ${method}`);
-		}
+		_addRoute.call(routes, method, rule, controllers);
 		return this;
 	};
 
@@ -149,6 +105,116 @@ function Gerkon(){
 
 		return result;
 	};
+
+	this.use = function(middleware){
+		_addMiddleware.call(middlewares, middleware);
+	};
+}
+
+/**
+ * Adds middleware
+ * @param middleware {function} Middleware function
+ */
+function _addMiddleware(middleware){
+	if(typeof middleware === 'function'){
+		if(middleware.length > 2){
+			this.add(function(req, res, responsePromise){
+				return new Promise(resolve => {
+					middleware(req, res, () => {
+						resolve();
+						return responsePromise;
+					});
+				});
+			});
+		}else{
+			this.add(middleware);
+		}
+	}else{
+		throw Error('Middleware must be a function');
+	}
+}
+
+/**
+ * Runs middlewares
+ * @param middlewares {Set} Set of middlewares to run
+ * @param responsePromise {function} Response promise
+ * @param req {object} Request object
+ * @param res {object} Response object
+ **/
+function _runMiddlewares(middlewares, responsePromise, req, res){
+	return seenk(function* (){
+		for(let middleware of middlewares){
+			yield middleware(req, res, responsePromise);
+		}
+	});
+}
+
+/**
+ * Adds a route
+ * @param method {string|Array} Request method or an array of methods
+ * @param rule {string} Route rule
+ * @param controllers {function|Array} Controller or array of controllers
+ * @returns {Gerkon}
+ * @this {routes}
+ * @method
+ */
+function _addRoute(method, rule, controllers){
+	let newRoute = {};
+
+	if(typeof arguments[2] === 'undefined' && typeof arguments[1] === 'function'){
+		controllers = rule;
+		rule = method;
+		method = ['GET', 'POST', 'PUT', 'HEAD', 'DELETE'];
+	}
+
+	if(method instanceof Array){
+		method.forEach(singleMethod => {
+			_addRoute.call(this, singleMethod, rule, controllers);
+		});
+		return;
+	}
+
+	if(typeof controllers === 'function'){
+		controllers = [controllers];
+	}
+
+	if(typeof method !== 'string'){
+		throw Error('Request method must be a string');
+	}
+	if(typeof rule !== 'string'){
+		throw Error('Route rule must be a string');
+	}
+	if(!(controllers instanceof Array)){
+		throw Error('Controller must be a function or an array of functions');
+	}
+
+	method = method.toLowerCase();
+
+	if(method in this){
+		if(!this[method].has(rule)){
+			newRoute.method = method;
+			newRoute.params = _fetchParamNames(rule);
+			newRoute.rule = _ruleToRegExp(rule);
+
+			// wrap async controllers into Promise
+			newRoute.controllers = controllers.map(controller => {
+				if(controller.length > 2){
+					return function(req, res){
+						return new Promise(resolve => {
+							controller(req, res, resolve);
+						});
+					};
+				}
+				return controller;
+			});
+
+			this[method].set(rule, newRoute);
+		}else{
+			throw Error('Route already exists');
+		}
+	}else{
+		throw Error(`Invalid request method: ${method}`);
+	}
 }
 
 /**

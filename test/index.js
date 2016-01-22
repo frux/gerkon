@@ -107,7 +107,7 @@ describe('Routing', () => {
 
 	it('should throws if controllers neither function nor array', () => {
 		assert.throws(() => {
-			(new Gerkon).route('get');
+			(new Gerkon).route('get', '/', true);
 		});
 	});
 
@@ -240,7 +240,7 @@ describe('Controllers', () => {
 				function(req, res){
 					req.testData.foo.should.eql('bar');
 					app.stop();
-					done();
+					return done();
 				}
 			])
 			.get('/data', (req, res) => res.end(JSON.stringify({foo: 'bar'})))
