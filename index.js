@@ -28,28 +28,40 @@ function Gerkon(){
 	function _onRequest(req, res){
 		const method = req.method.toLowerCase(),
 			url = req.url,
+
+			// try to find matching route
 			rule = _findRoute(routes[method], url),
+
+			// try to get found route (if not found we get undefined here)
 			route = routes[method].get(rule),
-			reqPromise = new Promise((resolve, reject) => {
+
+			// promise resolving on response sent
+			responsePromise = new Promise((resolve, reject) => {
 				res.on('finish', resolve);
 				res.on('error', reject);
 			});
 
-		_runMiddlewares(middlewares, reqPromise, req, res)
+		// run middlewares before controllers start
+		_runMiddlewares(middlewares, responsePromise, req, res)
 			.then(() => {
+				// if route were found
 				if(route){
+					// if route must have params
 					if(route.params.length){
+						// parse params from url
 						req.params = _parseParams(route, url);
 					}else{
 						req.params = {};
 					}
 
+					// run controllers of this route
 					_execRoute(route, req, res)
 						.then(() => {})
 						.catch(() => {
 							_on502(req, res);
 						});
 				}else{
+					// if route were not found send 404 error code
 					_on404(req, res);
 				}
 			});
@@ -62,6 +74,7 @@ function Gerkon(){
 	 * @method
 	 */
 	this.listen = function(port){
+		// create new server instance
 		server = _startServer(port, _onRequest);
 		return this;
 	};
@@ -72,6 +85,7 @@ function Gerkon(){
 	 * @method
 	 */
 	this.stop = function(){
+		// stop runing server instance
 		_stopServer(server);
 		return this;
 	};
@@ -85,6 +99,7 @@ function Gerkon(){
 	 * @method
 	 */
 	this.route = function(method, rule, controllers){
+		// add route
 		_addRoute.call(routes, method, rule, controllers);
 		return this;
 	};
@@ -97,7 +112,9 @@ function Gerkon(){
 	this.getRoutes = function(method){
 		let result = [];
 
+		// if requet method is a valid request method
 		if(method in routes){
+			// add each route rule to the result array
 			routes[method].forEach((route, rule) => {
 				result.push(rule);
 			});
@@ -106,8 +123,15 @@ function Gerkon(){
 		return result;
 	};
 
+	/**
+	 * Adds middleware
+	 * @param middleware {function} Middleware function
+	 * @returns {Gerkon}
+	 */
 	this.use = function(middleware){
+		// add middleware
 		_addMiddleware.call(middlewares, middleware);
+		return this;
 	};
 }
 
@@ -117,9 +141,15 @@ function Gerkon(){
  */
 function _addMiddleware(middleware){
 	if(typeof middleware === 'function'){
+		// if middleware have more then 2 params it is asyncronous
 		if(middleware.length > 2){
+			// wrap middleware function by the function returning promise
 			this.add(function(req, res, responsePromise){
 				return new Promise(resolve => {
+					// the 3rd argument is a function resolving
+					// current middleware promise
+					// and returns promise of the whole request
+					// to allow user to do something after response will be sent
 					middleware(req, res, () => {
 						resolve();
 						return responsePromise;
@@ -142,6 +172,7 @@ function _addMiddleware(middleware){
  * @param res {object} Response object
  **/
 function _runMiddlewares(middlewares, responsePromise, req, res){
+	// synchronously run each middleware
 	return seenk(function* (){
 		for(let middleware of middlewares){
 			yield middleware(req, res, responsePromise);
@@ -161,23 +192,31 @@ function _runMiddlewares(middlewares, responsePromise, req, res){
 function _addRoute(method, rule, controllers){
 	let newRoute = {};
 
+	// if two arguments provided and second argument is controller
 	if(typeof arguments[2] === 'undefined' && typeof arguments[1] === 'function'){
+		// shift arguments
 		controllers = rule;
 		rule = method;
+
+		// default value for method
 		method = ['GET', 'POST', 'PUT', 'HEAD', 'DELETE'];
 	}
 
+	// if multiple request methods provided
 	if(method instanceof Array){
+		// add this route for each of the specified methods
 		method.forEach(singleMethod => {
 			_addRoute.call(this, singleMethod, rule, controllers);
 		});
 		return;
 	}
 
+	// if comtroller is a single function wrap it by array
 	if(typeof controllers === 'function'){
 		controllers = [controllers];
 	}
 
+	// check that all arguments is valid
 	if(typeof method !== 'string'){
 		throw Error('Request method must be a string');
 	}
@@ -190,15 +229,23 @@ function _addRoute(method, rule, controllers){
 
 	method = method.toLowerCase();
 
+	// if method is a valid request method
 	if(method in this){
+		// if the same method were not added yet
 		if(!this[method].has(rule)){
 			newRoute.method = method;
+
+			// get list of params url must contains
 			newRoute.params = _fetchParamNames(rule);
+
+			// convert Gerkon rule to regular expression
 			newRoute.rule = _ruleToRegExp(rule);
 
 			// wrap async controllers into Promise
 			newRoute.controllers = controllers.map(controller => {
+				// if controller expects more then 2 arguments it is asynchronous
 				if(controller.length > 2){
+					// wrap controller by function returning promise
 					return function(req, res){
 						return new Promise(resolve => {
 							controller(req, res, resolve);
@@ -208,6 +255,7 @@ function _addRoute(method, rule, controllers){
 				return controller;
 			});
 
+			// add route
 			this[method].set(rule, newRoute);
 		}else{
 			throw Error('Route already exists');
@@ -224,6 +272,7 @@ function _addRoute(method, rule, controllers){
  * @returns {Gerkon}
  */
 Gerkon.prototype.get = function(rule, controllers){
+	// add route for GET request method
 	return this.route('get', rule, controllers);
 };
 
@@ -234,20 +283,23 @@ Gerkon.prototype.get = function(rule, controllers){
  * @returns {Gerkon}
  */
 Gerkon.prototype.post = function(rule, controllers){
+	// add route for POST request method
 	return this.route('post', rule, controllers);
 };
 
 /**
- * Checks if url matchs to the rule
+ * Checks if rule matchs to the url
  * @param rule {string|RegExp} Gerkon routing rule
  * @param url {string} Url to check
  * @returns {Boolean}
  * @static
  */
 Gerkon.match = function(rule, url){
+	// if rule is a string convert it to regexp
 	if(typeof rule === 'string'){
 		rule = _ruleToRegExp(rule);
 	}
+
 	if(!(rule instanceof RegExp && typeof url === 'string')){
 		throw Error('Rule must be a string or RegExp. Url must be a string.');
 	}
@@ -280,6 +332,7 @@ function _startServer(port, requestHandler){
  * @this {Gerkon}
  */
 function _stopServer(serverInstance){
+	// if server was running
 	if(serverInstance instanceof http.Server){
 		serverInstance.close();
 	}
@@ -350,6 +403,7 @@ function _ruleToRegExp(rule){
  * @returns {string}
  */
 function _findRoute(routes, url){
+	// test each rules of all routes to matches
 	for(let rule of routes.keys()){
 		let route = routes.get(rule);
 		if(route.rule.test(url)){
@@ -363,6 +417,7 @@ function _findRoute(routes, url){
  * @param
  */
 function _execRoute(route, req, res){
+	// synchronously run each controller
 	return seenk(function* (){
 		for(let controller of route.controllers){
 			yield controller(req, res);
