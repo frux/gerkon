@@ -1,7 +1,7 @@
 const Gerkon = require('gerkon');
 const app = new Gerkon();
-
-app.get('/', (req, res) => {
+console.log('Up!');
+app.get('/', (req, res) => { console.log(req);
 		res.writeHead({ 'Content-type': 'text/html' });
 		res.write('Hello world!');
 		res.end();	
