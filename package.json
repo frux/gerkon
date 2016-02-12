@@ -1,0 +1,26 @@
+{
+  "name": "gerkon-page",
+  "version": "0.0.1",
+  "description": "Gerkon web page",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/frux/gerkon.git"
+  },
+  "keywords": [
+    "gerkon",
+    "page"
+  ],
+  "author": "frux <qdinov@yandex.ru>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/frux/gerkon/issues"
+  },
+  "homepage": "https://github.com/frux/gerkon#readme",
+  "dependencies": {
+    "gerkon": "git://github.com/frux/gerkon.git"
+  }
+}
