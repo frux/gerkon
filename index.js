@@ -13,7 +13,9 @@ function Gerkon(){
 			post: new Map(),
 			put: new Map(),
 			head: new Map(),
-			delete: new Map()
+			delete: new Map(),
+			patch: new Map(),
+			options: new Map()
 		},
 		middlewares = new Set();
 
@@ -199,7 +201,7 @@ function _addRoute(method, rule, controllers){
 		rule = method;
 
 		// default value for method
-		method = ['GET', 'POST', 'PUT', 'HEAD', 'DELETE'];
+		method = Object.keys(this);
 	}
 
 	// if multiple request methods provided

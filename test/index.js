@@ -1,7 +1,9 @@
 'use strict';
+/* glogal describe */
+
+require('should');
 
 const assert = require('assert'),
-	should = require('should'),
 	got = require('got'),
 	seenk = require('seenk'),
 	Gerkon = require('../index'),
@@ -18,16 +20,17 @@ const assert = require('assert'),
 describe('Initialization', () => {
 	it('should throws if port was not specified', () => {
 		assert.throws(() => {
-			(new Gerkon).listen();
+			(new Gerkon()).listen();
 		});
 	});
 });
 
 describe('Use cases', () => {
 	it('should answers to ping', done => {
-		const port = getPort();
-		const url = `${HOST}:${port}/ping`;
-		const app = new Gerkon;
+		const port = getPort(),
+			url = `${HOST}:${port}/ping`,
+			app = new Gerkon();
+
 		seenk(function*(){
 			app.route('get', '/ping', (req, res) => {
 				res.end('ok');
@@ -89,50 +92,50 @@ describe('Routing rules parsing', () => {
 describe('Routing', () => {
 	it('should throws if rule was not specified', () => {
 		assert.throws(() => {
-			(new Gerkon).route('get');
+			(new Gerkon()).route('get');
 		});
 	});
 
 	it('should throws if rule is not a string', () => {
 		assert.throws(() => {
-			(new Gerkon).route('get', []);
+			(new Gerkon()).route('get', []);
 		});
 	});
 
 	it('should throws if controllers was not specified', () => {
 		assert.throws(() => {
-			(new Gerkon).route('get', '/');
+			(new Gerkon()).route('get', '/');
 		});
 	});
 
 	it('should throws if controllers neither function nor array', () => {
 		assert.throws(() => {
-			(new Gerkon).route('get', '/', true);
+			(new Gerkon()).route('get', '/', true);
 		});
 	});
 
 	it('should throws if method neither string nor array', () => {
 		assert.throws(() => {
-			(new Gerkon).route({}, '/', () => {});
+			(new Gerkon()).route({}, '/', () => {});
 		});
 	});
 
 	it('should throws if method is not a vaild request method', () => {
 		assert.throws(() => {
-			(new Gerkon).route('foo', '/', () => {});
+			(new Gerkon()).route('foo', '/', () => {});
 		});
 	});
 
 	it('should throws if route already exists', () => {
 		assert.throws(() => {
-			(new Gerkon)
+			(new Gerkon())
 			.route('get', '/', () => {})
 			.route('get', '/', () => {});
 		});
 	});
 
 	it('should adds route GET method', () => {
-		const app = new Gerkon;
+		const app = new Gerkon();
 
 		app.get('/', () => {});
 		app.getRoutes('get').length.should.eql(1);
@@ -140,10 +143,12 @@ describe('Routing', () => {
 		app.getRoutes('put').length.should.eql(0);
 		app.getRoutes('delete').length.should.eql(0);
 		app.getRoutes('head').length.should.eql(0);
+		app.getRoutes('patch').length.should.eql(0);
+		app.getRoutes('options').length.should.eql(0);
 	});
 
 	it('should adds route POST method', () => {
-		const app = new Gerkon;
+		const app = new Gerkon();
 
 		app.post('/', () => {});
 		app.getRoutes('get').length.should.eql(0);
@@ -151,10 +156,12 @@ describe('Routing', () => {
 		app.getRoutes('put').length.should.eql(0);
 		app.getRoutes('delete').length.should.eql(0);
 		app.getRoutes('head').length.should.eql(0);
+		app.getRoutes('patch').length.should.eql(0);
+		app.getRoutes('options').length.should.eql(0);
 	});
 
 	it('should adds routes for all request methods if not specified', () => {
-		const app = new Gerkon;
+		const app = new Gerkon();
 
 		app.route('/', () => {});
 		app.getRoutes('get').length.should.eql(1);
@@ -162,29 +169,34 @@ describe('Routing', () => {
 		app.getRoutes('put').length.should.eql(1);
 		app.getRoutes('delete').length.should.eql(1);
 		app.getRoutes('head').length.should.eql(1);
+		app.getRoutes('patch').length.should.eql(1);
+		app.getRoutes('options').length.should.eql(1);
 	});
 
 	it('should adds a route for each specified request method', () => {
-		const app = new Gerkon;
+		const app = new Gerkon();
 
-		app.route(['get', 'post', 'put'], '/', (req, res, next) => {});
+		app.route(['get', 'post', 'put', 'patch'], '/', () => {});
 		app.getRoutes('get').length.should.eql(1);
 		app.getRoutes('post').length.should.eql(1);
 		app.getRoutes('put').length.should.eql(1);
 		app.getRoutes('delete').length.should.eql(0);
 		app.getRoutes('head').length.should.eql(0);
+		app.getRoutes('patch').length.should.eql(1);
+		app.getRoutes('options').length.should.eql(0);
 	});
 
 	it('should returns empty array if requested invalid method', () => {
-		(new Gerkon).getRoutes('foo').should.eql([]);
+		(new Gerkon()).getRoutes('foo').should.eql([]);
 	});
 
 	it('should parse params from url', done => {
-		const port = getPort();
-		const url = `${HOST}:${port}/bar/1234`;
-		const app = new Gerkon;
+		const port = getPort(),
+			url = `${HOST}:${port}/bar/1234`,
+			app = new Gerkon();
+
 		app
-			.get('/<foo>/<id>', (req, res) => {
+			.get('/<foo>/<id>', req => {
 				req.params.foo.should.eql('bar');
 				req.params.id.should.eql('1234');
 				app.stop();
@@ -197,61 +209,104 @@ describe('Routing', () => {
 
 describe('Requests', () => {
 	it('should answer 404 if route was not found', done => {
-		const port = getPort();
-		const url = `${HOST}:${port}/not`;
-		const app = new Gerkon;
+		const port = getPort(),
+			url = `${HOST}:${port}/not`,
+			app = new Gerkon();
+
 		app.listen(port);
 		got(url).catch(err => {
-				app.stop();
-				err.statusCode.should.eql(404);
-				done();
-			});
+			app.stop();
+			err.statusCode.should.eql(404);
+			done();
+		});
 	});
 
 	it('should answer 502 if controller invoke error', done => {
-		const port = getPort();
-		const url = `${HOST}:${port}/error`;
-		const app = new Gerkon;
+		const port = getPort(),
+			url = `${HOST}:${port}/error`,
+			app = new Gerkon();
+
 		app
-			.get('/error', (req, res) => { res.send(notExistedVariable); })
+			.get('/error', () => {
+				throw Error('Error imitation');
+			})
 			.listen(port);
 		got(url).catch(err => {
-				app.stop();
-				err.statusCode.should.eql(502);
-				done();
-			});
+			app.stop();
+			err.statusCode.should.eql(502);
+			done();
+		});
 	});
 });
 
 describe('Controllers', () => {
 	it('should be running syncronously', done => {
-		const port = getPort();
-		const url = `${HOST}:${port}`;
-		const app = new Gerkon;
-		app.get('/async', [
-				function(req, res, next){
-					got(`${HOST}:${port}/data`)
-						.then(response => {
-							req.testData = JSON.parse(response.body);
-							setTimeout(() => next(), 500);
-						})
-						.catch(err => { console.log(err); });
-				},
-				function(req, res){
-					req.testData.foo.should.eql('bar');
-					app.stop();
-					return done();
-				}
-			])
-			.get('/data', (req, res) => res.end(JSON.stringify({foo: 'bar'})))
-			.listen(port);
+		const port = getPort(),
+			url = `${HOST}:${port}/data`,
+			app = new Gerkon();
 
-		got(`${HOST}:${port}/async`).catch(err => { console.log(err); });
+		app.get('/async', [
+			function(req, res, next){
+				got(url)
+					.then(response => {
+						req.testData = JSON.parse(response.body);
+						setTimeout(() => next(), 500);
+					})
+					.catch(err => console.log(err));
+			},
+			function(req){
+				req.testData.foo.should.eql('bar');
+				app.stop();
+				return done();
+			}
+		])
+		.get('/data', (req, res) => res.end(JSON.stringify({foo: 'bar'})))
+		.listen(port);
+
+		got(`${HOST}:${port}/async`).catch(err => console.log(err));
+	});
+});
+
+describe('Middleware', () => {
+	it('should adds sync middleware', () => {
+		(new Gerkon()).use((req, res) => {
+			req.should.be.ok();
+			res.should.be.ok();
+		});
+	});
+
+	it('should adds async middleware', () => {
+		(new Gerkon()).use((req, res, next) => {
+			req.should.be.ok();
+			res.should.be.ok();
+			return next();
+		});
+	});
+
+	it('next should resolves middleware', done => {
+		const port = getPort(),
+			path = '/async_mw',
+			url = `${HOST}:${port}${path}`,
+			app = new Gerkon();
+
+		app
+			.use((req, res, next) => {
+				next().should.be.instanceof(Promise);
+				done();
+			})
+			.listen(port);
+		got(url);
+	});
+
+	it('should throws if middleware is not a function', () => {
+		assert.throws(() => {
+			(new Gerkon()).use('not a function');
+		});
 	});
 });
 
 describe('General', () => {
 	it('shouldn\'t throws if user tries to stop not running app', () => {
-		(new Gerkon).stop();
+		(new Gerkon()).stop();
 	});
 });
