@@ -1,8 +1,0 @@
-node_modules/
-.idea
-atlassian-ide-plugin.xml
-.DS_Store
-.npmrc
-page/
-coverage/
-npm-debug.log
