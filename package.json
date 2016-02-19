@@ -6,23 +6,23 @@
   "scripts": {
     "test": "npm run lint && npm run mocha",
     "mocha": "./node_modules/.bin/mocha",
-    "lint": "./node_modules/.bin/eslint index.js",
+    "lint": "./node_modules/.bin/eslint index.js test/index.js",
     "coverage": "./node_modules/.bin/istanbul cover ./node_modules/.bin/_mocha",
     "coveralls": "./node_modules/.bin/istanbul-coveralls",
-	"prepush": "npm test"
+    "prepush": "npm test"
   },
   "author": "Vladimir Kudinov <qdinov@yandex.ru>",
   "license": "WTFPL",
-	"engines": {
+  "engines": {
     "node": ">=4.0.0"
   },
   "dependencies": {
     "seenk": "^0.2.2"
   },
   "devDependencies": {
-    "eslint": "^1.10.3",
+    "eslint": "^2.2.0",
     "got": "^6.0.2",
-    "husky": "^0.10.2",
+    "husky": "^0.11.1",
     "istanbul": "^0.4.2",
     "istanbul-coveralls": "^1.0.3",
     "mocha": "^2.3.4",
