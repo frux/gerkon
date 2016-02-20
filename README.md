@@ -7,7 +7,7 @@ Web applications framework
 
 ```js
 const Gerkon = require('gerkon');
-const app = new Gerkon;
+const app = new Gerkon();
 
 app.route('/', (req, res) => {
 		res.send('Index page');
