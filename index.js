@@ -6,4 +6,4 @@ app.get('/', (req, res) => {
 });
 
 app.listen(process.env.PORT || 3163);
-console.log(`Application has started on localhost:${process.env.PORT || 3163}`);
+console.log(`Application has started on http://localhost:${process.env.PORT || 3163}`);
