@@ -24,6 +24,6 @@
   },
   "homepage": "https://github.com/frux/gerkon#readme",
   "dependencies": {
-    "gerkon": "git://github.com/frux/gerkon.git"
+    "gerkon": "~2.0.0"
   }
 }
