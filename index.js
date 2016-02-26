@@ -1,8 +1,11 @@
 const Gerkon = require('gerkon'),
+	path = require('path'),
 	app = new Gerkon();
 
+app.use(require('gerkon-jade'));
 app.get('/', (req, res) => {
-	res.end('Hello World!');
+	const data = {};
+	res.renderTemplate(path.resolve(__dirname, './templates/pages/index.jade'), data);
 });
 
 app.listen(process.env.PORT || 3163);
