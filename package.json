@@ -5,10 +5,10 @@
   "main": "index.js",
   "scripts": {
     "test": "npm run lint && npm run mocha",
-    "mocha": "./node_modules/.bin/mocha",
-    "lint": "./node_modules/.bin/eslint index.js test/index.js",
-    "coverage": "./node_modules/.bin/istanbul cover ./node_modules/.bin/_mocha",
-    "coveralls": "./node_modules/.bin/istanbul-coveralls",
+    "mocha": "mocha",
+    "lint": "eslint index.js test/index.js",
+    "coverage": "istanbul cover ./node_modules/.bin/_mocha",
+    "coveralls": "istanbul-coveralls",
     "prepush": "npm test"
   },
   "author": "Vladimir Kudinov <qdinov@yandex.ru>",
@@ -27,5 +27,20 @@
     "istanbul-coveralls": "^1.0.3",
     "mocha": "^2.3.4",
     "should": "^8.1.1"
-  }
+  },
+  "directories": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/frux/gerkon.git"
+  },
+  "keywords": [
+    "gerkon",
+    "framework"
+  ],
+  "bugs": {
+    "url": "https://github.com/frux/gerkon/issues"
+  },
+  "homepage": "https://github.com/frux/gerkon#readme"
 }
