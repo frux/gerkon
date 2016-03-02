@@ -1,7 +1,5 @@
 'use strict';
-/* glogal describe */
-
-require('should');
+/* globals describe, it */
 
 const assert = require('assert'),
 	got = require('got'),
@@ -34,9 +32,10 @@ describe('Use cases', () => {
 		seenk(function*(){
 			app.route('get', '/ping', (req, res) => {
 				res.end('ok');
+				app.stop();
 			}).listen(port);
 
-			(yield got(url)).body.should.eql('ok');
+			assert.equal((yield got(url)).body, 'ok');
 
 			app.stop();
 			done();
@@ -46,42 +45,42 @@ describe('Use cases', () => {
 
 describe('Routing rules parsing', () => {
 	it('simple rule', () => {
-		Gerkon.match('/simple/route', '/simple/route').should.be.ok();
-		Gerkon.match('/simple/route', '/simple/route/').should.not.be.ok();
+		assert(Gerkon.match('/simple/route', '/simple/route'));
+		assert.equal(Gerkon.match('/simple/route', '/simple/route/'), false);
 	});
 
 	it('rule with optional parts', () => {
-		Gerkon.match('/simple{/route}', '/simple/route').should.be.ok();
-		Gerkon.match('/simple{/route}', '/simple').should.be.ok();
-		Gerkon.match('/simple{/route}', '/simple/').should.not.be.ok();
+		assert(Gerkon.match('/simple{/route}', '/simple/route'));
+		assert(Gerkon.match('/simple{/route}', '/simple'));
+		assert.equal(Gerkon.match('/simple{/route}', '/simple/'), false);
 	});
 
 	it('rule with any symbols', () => {
-		Gerkon.match('/test*', '/testimonials').should.be.ok();
-		Gerkon.match('/test*', '/test').should.be.ok();
-		Gerkon.match('/test*', '/test123').should.be.ok();
-		Gerkon.match('/test*', '/test*').should.be.ok();
-		Gerkon.match('/test*', '/tes').should.not.be.ok();
+		assert(Gerkon.match('/test*', '/testimonials'));
+		assert(Gerkon.match('/test*', '/test'));
+		assert(Gerkon.match('/test*', '/test123'));
+		assert(Gerkon.match('/test*', '/test*'));
+		assert.equal(Gerkon.match('/test*', '/tes'), false);
 	});
 
 	it('rule with params', () => {
-		Gerkon.match('/<param1>/<param2>', '/1/2').should.be.ok();
-		Gerkon.match('/<param1>/<param2>', '/foo/bar').should.be.ok();
-		Gerkon.match('/<param1>#<param2>', '/foo#bar').should.be.ok();
-		Gerkon.match('/<param1>/<param2>', '/foo/_/bar').should.not.be.ok();
+		assert(Gerkon.match('/<param1>/<param2>', '/1/2'));
+		assert(Gerkon.match('/<param1>/<param2>', '/foo/bar'));
+		assert(Gerkon.match('/<param1>#<param2>', '/foo#bar'));
+		assert.equal(Gerkon.match('/<param1>/<param2>', '/foo/_/bar'), false);
 	});
 
 	it('complex rule', () => {
-		Gerkon.match('/test{/optional}/<userName>/<password>*', '/test/frux/1234').should.be.ok();
-		Gerkon.match('/test{/optional}/<userName>/<password>*', '/test/optional/frux/1234').should.be.ok();
-		Gerkon.match('/test{/optional}/<userName>/<password>*', '/test/frux/1234/').should.be.ok();
-		Gerkon.match('/test{/optional}/<userName>/<password>*', '/test/frux/1234/some_more/url').should.be.ok();
-		Gerkon.match('/test{/optional}/<userName>/<password>*', '/test/frux').should.not.be.ok();
-		Gerkon.match('/test{/optional}/<userName>/<password>*', '/test').should.not.be.ok();
+		assert(Gerkon.match('/test{/optional}/<userName>/<password>*', '/test/frux/1234'));
+		assert(Gerkon.match('/test{/optional}/<userName>/<password>*', '/test/optional/frux/1234'));
+		assert(Gerkon.match('/test{/optional}/<userName>/<password>*', '/test/frux/1234/'));
+		assert(Gerkon.match('/test{/optional}/<userName>/<password>*', '/test/frux/1234/some_more/url'));
+		assert.equal(Gerkon.match('/test{/optional}/<userName>/<password>*', '/test/frux'), false);
+		assert.equal(Gerkon.match('/test{/optional}/<userName>/<password>*', '/test'), false);
 	});
 
 	it('should check matching to regexp', () => {
-		Gerkon.match(/\/test/, '/test').should.be.ok();
+		assert(Gerkon.match(/\/test/, '/test'));
 	});
 
 	it('should throws if rule is neither string nor regexp', () => {
@@ -138,56 +137,56 @@ describe('Routing', () => {
 		const app = new Gerkon();
 
 		app.get('/', () => {});
-		app.getRoutes('get').length.should.eql(1);
-		app.getRoutes('post').length.should.eql(0);
-		app.getRoutes('put').length.should.eql(0);
-		app.getRoutes('delete').length.should.eql(0);
-		app.getRoutes('head').length.should.eql(0);
-		app.getRoutes('patch').length.should.eql(0);
-		app.getRoutes('options').length.should.eql(0);
+		assert.equal(app.getRoutes('get').length, 1);
+		assert.equal(app.getRoutes('post').length, 0);
+		assert.equal(app.getRoutes('put').length, 0);
+		assert.equal(app.getRoutes('delete').length, 0);
+		assert.equal(app.getRoutes('head').length, 0);
+		assert.equal(app.getRoutes('patch').length, 0);
+		assert.equal(app.getRoutes('options').length, 0);
 	});
 
 	it('should adds route POST method', () => {
 		const app = new Gerkon();
 
 		app.post('/', () => {});
-		app.getRoutes('get').length.should.eql(0);
-		app.getRoutes('post').length.should.eql(1);
-		app.getRoutes('put').length.should.eql(0);
-		app.getRoutes('delete').length.should.eql(0);
-		app.getRoutes('head').length.should.eql(0);
-		app.getRoutes('patch').length.should.eql(0);
-		app.getRoutes('options').length.should.eql(0);
+		assert.equal(app.getRoutes('get').length, 0);
+		assert.equal(app.getRoutes('post').length, 1);
+		assert.equal(app.getRoutes('put').length, 0);
+		assert.equal(app.getRoutes('delete').length, 0);
+		assert.equal(app.getRoutes('head').length, 0);
+		assert.equal(app.getRoutes('patch').length, 0);
+		assert.equal(app.getRoutes('options').length, 0);
 	});
 
 	it('should adds routes for all request methods if not specified', () => {
 		const app = new Gerkon();
 
 		app.route('/', () => {});
-		app.getRoutes('get').length.should.eql(1);
-		app.getRoutes('post').length.should.eql(1);
-		app.getRoutes('put').length.should.eql(1);
-		app.getRoutes('delete').length.should.eql(1);
-		app.getRoutes('head').length.should.eql(1);
-		app.getRoutes('patch').length.should.eql(1);
-		app.getRoutes('options').length.should.eql(1);
+		assert.equal(app.getRoutes('get').length, 1);
+		assert.equal(app.getRoutes('post').length, 1);
+		assert.equal(app.getRoutes('put').length, 1);
+		assert.equal(app.getRoutes('delete').length, 1);
+		assert.equal(app.getRoutes('head').length, 1);
+		assert.equal(app.getRoutes('patch').length, 1);
+		assert.equal(app.getRoutes('options').length, 1);
 	});
 
 	it('should adds a route for each specified request method', () => {
 		const app = new Gerkon();
 
 		app.route(['get', 'post', 'put', 'patch'], '/', () => {});
-		app.getRoutes('get').length.should.eql(1);
-		app.getRoutes('post').length.should.eql(1);
-		app.getRoutes('put').length.should.eql(1);
-		app.getRoutes('delete').length.should.eql(0);
-		app.getRoutes('head').length.should.eql(0);
-		app.getRoutes('patch').length.should.eql(1);
-		app.getRoutes('options').length.should.eql(0);
+		assert.equal(app.getRoutes('get').length, 1);
+		assert.equal(app.getRoutes('post').length, 1);
+		assert.equal(app.getRoutes('put').length, 1);
+		assert.equal(app.getRoutes('delete').length, 0);
+		assert.equal(app.getRoutes('head').length, 0);
+		assert.equal(app.getRoutes('patch').length, 1);
+		assert.equal(app.getRoutes('options').length, 0);
 	});
 
 	it('should returns empty array if requested invalid method', () => {
-		(new Gerkon()).getRoutes('foo').should.eql([]);
+		assert.deepEqual((new Gerkon()).getRoutes('foo'), []);
 	});
 
 	it('should parse params from url', done => {
@@ -197,8 +196,8 @@ describe('Routing', () => {
 
 		app
 			.get('/<foo>/<id>', req => {
-				req.params.foo.should.eql('bar');
-				req.params.id.should.eql('1234');
+				assert.equal(req.params.foo, 'bar');
+				assert.equal(req.params.id, '1234');
 				app.stop();
 				done();
 			})
@@ -216,7 +215,7 @@ describe('Requests', () => {
 		app.listen(port);
 		got(url).catch(err => {
 			app.stop();
-			err.statusCode.should.eql(404);
+			assert.equal(err.statusCode, 404);
 			done();
 		});
 	});
@@ -233,7 +232,7 @@ describe('Requests', () => {
 			.listen(port);
 		got(url).catch(err => {
 			app.stop();
-			err.statusCode.should.eql(502);
+			assert.equal(err.statusCode, 502);
 			done();
 		});
 	});
@@ -255,7 +254,7 @@ describe('Controllers', () => {
 					.catch(err => console.log(err));
 			},
 			function(req){
-				req.testData.foo.should.eql('bar');
+				assert.equal(req.testData.foo, 'bar');
 				app.stop();
 				return done();
 			}
@@ -270,15 +269,15 @@ describe('Controllers', () => {
 describe('Middleware', () => {
 	it('should adds sync middleware', () => {
 		(new Gerkon()).use((req, res) => {
-			req.should.be.ok();
-			res.should.be.ok();
+			assert(req);
+			assert(res);
 		});
 	});
 
 	it('should adds async middleware', () => {
 		(new Gerkon()).use((req, res, next) => {
-			req.should.be.ok();
-			res.should.be.ok();
+			assert(req);
+			assert(res);
 			return next();
 		});
 	});
@@ -291,7 +290,8 @@ describe('Middleware', () => {
 
 		app
 			.use((req, res, next) => {
-				next().should.be.instanceof(Promise);
+				assert(next() instanceof Promise);
+				app.stop();
 				done();
 			})
 			.listen(port);
@@ -308,5 +308,281 @@ describe('Middleware', () => {
 describe('General', () => {
 	it('shouldn\'t throws if user tries to stop not running app', () => {
 		(new Gerkon()).stop();
+	});
+});
+
+describe('Steroids', () => {
+	it('should sends content with status code 200', done => {
+		seenk(function* (){
+			const port = getPort(),
+				path = '/res_send',
+				url = `${HOST}:${port}${path}`,
+				app = new Gerkon();
+			let response;
+
+			app
+				.get(path, (req, res) => {
+					res.send('ok');
+					app.stop();
+				})
+				.listen(port);
+
+			response = yield got(url);
+			assert.equal(response.body, 'ok');
+			assert.equal(response.statusCode, 200);
+			done();
+		});
+	});
+
+	it('should sends specified status code', done => {
+		seenk(function* (){
+			const port = getPort(),
+				path = '/res_send_code',
+				url = `${HOST}:${port}${path}`,
+				app = new Gerkon();
+			let response;
+
+			app
+				.get(path, (req, res) => {
+					res.sendCode(202, 'ok');
+					app.stop();
+				})
+				.listen(port);
+
+			response = yield got(url);
+			assert.equal(response.body, 'ok');
+			assert.equal(response.statusCode, 202);
+			done();
+		});
+	});
+
+	it('should throws if status code is not valid', done => {
+		const port = getPort(),
+			path = '/res_send_code_invalid',
+			url = `${HOST}:${port}${path}`,
+			app = new Gerkon();
+
+		app
+			.get(path, (req, res) => {
+				assert.throws(() => {
+					res.sendCode({}, 'bang');
+				});
+				app.stop();
+				done();
+			})
+			.listen(port);
+
+		got(url);
+	});
+
+	it('should redirects with 302 status code by default', done => {
+		seenk(function* (){
+			const port = getPort(),
+				path = '/res_redirect',
+				url = `${HOST}:${port}${path}`,
+				app = new Gerkon();
+
+			app
+				.get(path, (req, res) => {
+					res.redirect('/res_redirect_target');
+					app.stop();
+				})
+				.listen(port);
+
+			require('http').get(url, res => {
+				assert(res.statusCode, 302);
+				done();
+			});
+		});
+	});
+
+	it('should redirects with 307 status code', done => {
+		seenk(function* (){
+			const port = getPort(),
+				path = '/res_redirect_307',
+				url = `${HOST}:${port}${path}`,
+				app = new Gerkon();
+
+			app
+				.get(path, (req, res) => {
+					res.redirect('/res_redirect_target', 307);
+					app.stop();
+				})
+				.listen(port);
+
+			require('http').get(url, res => {
+				assert(res.statusCode, 307);
+				done();
+			});
+		});
+	});
+
+	it('should throws if url is not a string', done => {
+		const port = getPort(),
+			path = '/res_redirect_invalid',
+			url = `${HOST}:${port}${path}`,
+			app = new Gerkon();
+
+		app
+			.get(path, (req, res) => {
+				assert.throws(() => {
+					res.redirect({});
+				});
+				app.stop();
+				done();
+			})
+			.listen(port);
+
+		got(url);
+	});
+
+	it('should throws if url is not a string', done => {
+		const port = getPort(),
+			path = '/res_redirect_invalid',
+			url = `${HOST}:${port}${path}`,
+			app = new Gerkon();
+
+		app
+			.get(path, (req, res) => {
+				assert.throws(() => {
+					res.redirect({});
+				});
+				app.stop();
+				done();
+			})
+			.listen(port);
+
+		got(url);
+	});
+
+	it('should sends content of file with status code 200', done => {
+		seenk(function* (){
+			const port = getPort(),
+				path = '/res_file',
+				url = `${HOST}:${port}${path}`,
+				app = new Gerkon();
+			let response;
+
+			app
+				.get(path, (req, res) => {
+					res.file(`${__dirname}/test.txt`);
+					app.stop();
+				})
+				.listen(port);
+
+			response = yield got(url);
+			assert.equal(response.body, 'ok');
+			assert.equal(response.statusCode, 200);
+			done();
+		});
+	});
+
+	it('should catch error if file path is not a string', done => {
+		seenk(function* (){
+			const port = getPort(),
+				path = '/res_file_wrong_name',
+				url = `${HOST}:${port}${path}`,
+				app = new Gerkon();
+
+			app
+				.get(path, (req, res) => {
+					res.file([])
+						.catch(() => {
+							app.stop();
+							done();
+						});
+				})
+				.static(__dirname)
+				.listen(port);
+
+			got(url);
+		});
+	});
+});
+
+describe('Params', () => {
+	const app = new Gerkon();
+
+	it('should returns app instance after param setting', () => {
+		assert(app.param('test1', 'test') instanceof Gerkon);
+	});
+
+	it('should returns param value', () => {
+		assert.equal(app.param('test2', 'test').param('test2'), 'test');
+	});
+
+	it('should throws if paramName is not a string', () => {
+		assert.throws(() => {
+			app.param([], 'test');
+		});
+	});
+});
+
+describe('Static', () => {
+	it('should returns app instance', () => {
+		assert((new Gerkon()).static(__dirname) instanceof Gerkon);
+	});
+
+	it('should throws if static path is not a string', () => {
+		assert.throws(() => {
+			(new Gerkon()).static([]);
+		});
+	});
+
+	it('should searches for routes first', done => {
+		const port = getPort(),
+			path = '/static/test.txt',
+			url = `${HOST}:${port}${path}`,
+			app = new Gerkon();
+
+		app
+			.get(path, () => {
+				app.stop();
+				done();
+			})
+			.static(__dirname)
+			.listen(port);
+		got(url);
+	});
+
+	it('should send file content if rule was not found', done => {
+		seenk(function* (){
+			const port = getPort(),
+				filePath = '/test.txt',
+				url = `${HOST}:${port}${filePath}`,
+				app = new Gerkon();
+
+			app
+				.static(__dirname)
+				.listen(port);
+			assert.equal((yield got(url)).body, 'ok');
+		})
+			.then(() => {
+				done();
+			})
+			.catch(err => {
+				assert.fail(200, err.statusCode, err.statusMessage);
+			});
+	});
+
+	it('should send 404 if neither routing rule or file were not found', done => {
+		seenk(function* (){
+			const port = getPort(),
+				filePath = '/unexistingfile.txt',
+				url = `${HOST}:${port}${filePath}`,
+				app = new Gerkon();
+
+			app
+				.static(__dirname)
+				.listen(port);
+			assert.equal((yield got(url)).body, 'ok');
+		})
+			.then(() => {
+				assert.fail(404, 200);
+			})
+			.catch(err => {
+				assert.equal(err.statusCode, 404);
+				done();
+			});
 	});
 });

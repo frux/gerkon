@@ -1,7 +1,9 @@
 'use strict';
 
 const seenk = require('seenk'),
-	  http = require('http');
+	  http = require('http'),
+	  path = require('path'),
+	  steroids = require('./gerkon-reqres-steroids');
 
 /**
  * Gerkon class
@@ -17,7 +19,9 @@ function Gerkon(){
 			patch: new Map(),
 			options: new Map()
 		},
-		middlewares = new Set();
+		middlewares = new Set(),
+		params = new Map(),
+		app = this;
 
 	let server;
 
@@ -43,11 +47,17 @@ function Gerkon(){
 				res.on('error', reject);
 			});
 
+		// use standard gerkon middleware
+		app.use(steroids);
+
 		// run middlewares before controllers start
 		_runMiddlewares(middlewares, responsePromise, req, res)
 			.then(() => {
 				// if route were found
 				if(route){
+					// set reference to the app
+					req.app = app;
+
 					// if route must have params
 					if(route.params.length){
 						// parse params from url
@@ -62,8 +72,14 @@ function Gerkon(){
 						.catch(() => {
 							_on502(req, res);
 						});
+
+				// if route was not found and static param is defined try to open file
+				}else if(app.param('static')){
+					res.file(path.resolve(app.param('static'), `.${req.url}`))
+						.catch(() => {
+							_on404(req, res);
+						});
 				}else{
-					// if route were not found send 404 error code
 					_on404(req, res);
 				}
 			});
@@ -133,6 +149,39 @@ function Gerkon(){
 	this.use = function(middleware){
 		// add middleware
 		_addMiddleware.call(middlewares, middleware);
+		return this;
+	};
+
+	/**
+	 * Sets/returns param value
+	 * @param paramName {string} Param name
+	 * @param paramVal {*|undefined} Param value
+	 * @returns {*}
+	 */
+	this.param = function(paramName, paramVal){
+		if(typeof paramName !== 'string'){
+			throw Error('Param name must be a string');
+		}
+
+		if(typeof paramVal !== 'undefined'){
+			params.set(paramName, paramVal);
+			return this;
+		}
+
+		return params.get(paramName);
+	};
+
+	/**
+	 * Defines path of static files
+	 * @param path {string} Path of static files
+	 * @returns {Gerkon}
+	 */
+	this.static = function(path){
+		if(typeof path === 'string'){
+			this.param('static', path);
+		}else{
+			throw Error('Path must be a string');
+		}
 		return this;
 	};
 }
@@ -434,11 +483,7 @@ function _execRoute(route, req, res){
  */
 function _on404(req, res){
 	// TODO:404
-	res.writeHead(404, {
-		'Content-Type': 'text/plain'
-	});
-	res.write('Not found');
-	res.end();
+	res.sendCode(404, 'Internal error');
 }
 
 /**
@@ -448,11 +493,7 @@ function _on404(req, res){
  */
 function _on502(req, res){
 	// TODO:502
-	res.writeHead(502, {
-		'Content-Type': 'text/plain'
-	});
-	res.write('Internal error');
-	res.end();
+	res.sendCode(502, 'Internal error');
 }
 
 module.exports = Gerkon;

@@ -6,7 +6,7 @@
   "scripts": {
     "test": "npm run lint && npm run mocha",
     "mocha": "mocha",
-    "lint": "eslint index.js test/index.js",
+    "lint": "eslint index.js gerkon-reqres-steroids.js test/index.js",
     "coverage": "istanbul cover ./node_modules/.bin/_mocha",
     "coveralls": "istanbul-coveralls",
     "prepush": "npm test"
