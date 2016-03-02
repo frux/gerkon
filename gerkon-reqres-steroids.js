@@ -1,6 +1,7 @@
 'use strict';
 
-const fs = require('fs');
+const fs = require('fs'),
+	mime = require('mime');
 
 module.exports = function(req, res, next){
 	/**
@@ -25,6 +26,7 @@ module.exports = function(req, res, next){
 				readable = fs.createReadStream(filePath);
 				readable.on('error', reject);
 				readable.on('end', resolve);
+				this.setHeader('Content-Type', mime.lookup(filePath));
 				readable.pipe(this);
 			}else{
 				reject(Error('File path must be a string'));

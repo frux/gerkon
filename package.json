@@ -1,6 +1,6 @@
 {
   "name": "gerkon",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Web applications framework",
   "main": "index.js",
   "scripts": {
@@ -17,6 +17,7 @@
     "node": ">=4.0.0"
   },
   "dependencies": {
+    "mime": "^1.3.4",
     "seenk": "^0.2.2"
   },
   "devDependencies": {
