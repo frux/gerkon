@@ -1,6 +1,11 @@
 doctype html
 html
 	head
-		title Hello world!
+		title #{texts.meta.title}
+		meta(name="og:title" content=texts.og.title)
+		meta(name="og:description" content=texts.og.description)
+		meta(name="og:image" content=texts.og.image)
+		link(rel="stylesheet" href="./css/index.css")
 	body
-		.b-page Hello world!
+		.b-page
+			img.logo(src="./images/logo_full.svg" alt="Gerkon")

@@ -11,7 +11,6 @@
     "rules": {
         "comma-dangle": [2, "never"],
         "no-cond-assign": 2,
-        "no-constant-condition": 2,
         "no-control-regex": 2,
         "no-debugger": 2,
         "no-dupe-args": 2,
@@ -90,7 +89,6 @@
         "no-undef": [2, {"typeof": true}],
         "no-unused-vars": 2,
         "no-use-before-define": [2, "nofunc"],
-        "handle-callback-err": 1,
         "no-mixed-requires": 0,
         "no-new-require": 2,
         "no-path-concat": 2,
@@ -106,7 +104,6 @@
         "jsx-quotes": 2,
         "key-spacing": [2, {"beforeColon": false, "afterColon": true}],
         "linebreak-style": [2, "unix"],
-        "max-nested-callbacks": [1, 4],
         "new-cap": [2, {"newIsCap": true, "capIsNew": true}],
         "new-parens": 2,
         "no-array-constructor": 2,
