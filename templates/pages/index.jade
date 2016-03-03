@@ -1,11 +1,7 @@
+
 doctype html
 html
-	head
-		title #{texts.meta.title}
-		meta(name="og:title" content=texts.og.title)
-		meta(name="og:description" content=texts.og.description)
-		meta(name="og:image" content=texts.og.image)
-		link(rel="stylesheet" href="./css/index.css")
-	body
-		.b-page
-			img.logo(src="./images/logo_full.svg" alt="Gerkon")
+	include ../blocks/b-page/b-page__head.jade
+	body.b-page
+		include ../blocks/metrika/metrika.jade
+		img.logo(src="./images/logo_full.svg" alt="Gerkon")

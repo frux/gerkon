@@ -18,7 +18,10 @@ app.use((req, res, next) => {
 });
 app.get('/', (req, res) => {
 	const data = {
-		texts
+		texts,
+		data: {
+			metrika: config.metrika
+		}
 	};
 	res.renderTemplate(path.resolve(__dirname, './templates/pages/index.jade'), data);
 });

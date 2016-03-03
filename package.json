@@ -28,7 +28,7 @@
   "dependencies": {
     "config-helper": "^1.2.0",
     "gerkon": "^2.1.0",
-    "gerkon-jade": "0.0.1"
+    "gerkon-jade": "^0.0.3"
   },
   "devDependencies": {
     "mocha": "^2.4.5"
